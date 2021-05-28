@@ -3,6 +3,7 @@ package misk.jobqueue.sqs
 import com.amazonaws.http.timers.client.ClientExecutionTimeoutException
 import com.amazonaws.services.sqs.model.Message
 import com.amazonaws.services.sqs.model.ReceiveMessageRequest
+import com.google.common.util.concurrent.Service
 import com.google.common.util.concurrent.ServiceManager
 import com.squareup.moshi.Moshi
 import io.opentracing.Tracer
@@ -14,11 +15,11 @@ import misk.feature.FeatureFlags
 import misk.jobqueue.JobConsumer
 import misk.jobqueue.JobHandler
 import misk.jobqueue.QueueName
-import misk.logging.getLogger
 import misk.tasks.RepeatedTaskQueue
 import misk.tasks.Status
 import misk.time.timed
 import misk.tracing.traceWithNewRootSpan
+import wisp.logging.getLogger
 import java.time.Duration
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.ConcurrentHashMap
@@ -59,10 +60,14 @@ internal class SqsJobConsumer @Inject internal constructor(
       "subscribing to queue ${queueName.value}"
     }
     taskQueue.scheduleWithBackoff(Duration.ZERO) {
+
       // Don't call handlers until all services are ready, otherwise handlers will crash because
       // the services they might need (databases, etc.) won't be ready.
-      serviceManagerProvider.get().awaitHealthy()
-      receiver.run()
+      if (serviceManagerProvider.get().isHealthy) {
+        receiver.run()
+      } else {
+        Status.NO_WORK
+      }
     }
   }
 
@@ -79,24 +84,27 @@ internal class SqsJobConsumer @Inject internal constructor(
     fun run(): Status {
       // Receive messages in parallel. Default to 1 if feature flag is not defined.
       val futures = receiverIds().map {
-            CompletableFuture.supplyAsync(Supplier {
-              receive()
-            }, receivingThreads)
-          }
+        CompletableFuture.supplyAsync(
+          Supplier {
+            receive()
+          },
+          receivingThreads
+        )
+      }
 
       // Either all messages are consumed and processed successfully, or we signal failure.
       // If none of the received consume any messages, return NO_WORK for backoff.
       return CompletableFuture.allOf(*futures.toTypedArray()).thenApply {
         futures.flatMap { it.join() }
-            .onEach { check( it in listOf(Status.FAILED, Status.OK, Status.NO_WORK)) }
-            .fold(Status.NO_WORK) { finalStatus, status ->
-              when {
-                status == Status.FAILED -> status
-                status == Status.OK && finalStatus != Status.FAILED -> status
-                status == Status.NO_WORK && finalStatus == Status.NO_WORK -> status
-                else -> finalStatus
-              }
+          .onEach { check(it in listOf(Status.FAILED, Status.OK, Status.NO_WORK)) }
+          .fold(Status.NO_WORK) { finalStatus, status ->
+            when {
+              status == Status.FAILED -> status
+              status == Status.OK && finalStatus != Status.FAILED -> status
+              status == Status.NO_WORK && finalStatus == Status.NO_WORK -> status
+              else -> finalStatus
             }
+          }
       }.join()
     }
 
@@ -110,10 +118,10 @@ internal class SqsJobConsumer @Inject internal constructor(
         return (1..numReceiversPerPodForQueue).toList()
       }
       return (1..receiversForQueue())
-          .filter { num ->
-            val lease = leaseManager.requestLease("sqs-job-consumer-${queue.name.value}-$num")
-            lease.checkHeld()
-          }
+        .filter { num ->
+          val lease = leaseManager.requestLease("sqs-job-consumer-${queue.name.value}-$num")
+          lease.checkHeld()
+        }
     }
 
     private fun receiversPerPodForQueue(): Int {
@@ -129,10 +137,10 @@ internal class SqsJobConsumer @Inject internal constructor(
         metrics.sqsReceiveTime.timedMills(queue.queueName, queue.queueName) {
           queue.call { client ->
             val receiveRequest = ReceiveMessageRequest()
-                .withAttributeNames("All")
-                .withMessageAttributeNames("All")
-                .withQueueUrl(queue.url)
-                .withMaxNumberOfMessages(config.message_batch_size)
+              .withAttributeNames("All")
+              .withMessageAttributeNames("All")
+              .withQueueUrl(queue.url)
+              .withMaxNumberOfMessages(config.message_batch_size)
 
             client.receiveMessage(receiveRequest).messages
           }
@@ -161,32 +169,37 @@ internal class SqsJobConsumer @Inject internal constructor(
 
     private fun handleMessages(messages: List<SqsJob>): List<CompletableFuture<Status>> {
       return messages.map { message ->
-        CompletableFuture.supplyAsync(Supplier {
-          metrics.jobsReceived.labels(queue.queueName, queue.queueName).inc()
+        CompletableFuture.supplyAsync(
+          Supplier {
+            metrics.jobsReceived.labels(queue.queueName, queue.queueName).inc()
 
-          tracer.traceWithNewRootSpan("handle-job-${queue.queueName}") { span ->
-            // If the incoming job has an original trace id, set that as a tag on the new span.
-            // We don't turn that into the parent of the current span because that would
-            // incorrectly include the execution time of the job in the execution time of the
-            // action that triggered the job
-            message.attributes[SqsJob.ORIGINAL_TRACE_ID_ATTR]?.let {
-              ORIGINAL_TRACE_ID_TAG.set(span, it)
-            }
+            tracer.traceWithNewRootSpan("handle-job-${queue.queueName}") { span ->
+              // If the incoming job has an original trace id, set that as a tag on the new span.
+              // We don't turn that into the parent of the current span because that would
+              // incorrectly include the execution time of the job in the execution time of the
+              // action that triggered the job
+              message.attributes[SqsJob.ORIGINAL_TRACE_ID_ATTR]?.let {
+                ORIGINAL_TRACE_ID_TAG.set(span, it)
+              }
 
-            // Run the handler and record timing
-            try {
-              val (duration, _) = timed { handler.handleJob(message) }
-              metrics.handlerDispatchTime.record(duration.toMillis().toDouble(), queue.queueName,
-                  queue.queueName)
-              Status.OK
-            } catch (th: Throwable) {
-              log.error(th) { "error handling job from ${queue.queueName}" }
-              metrics.handlerFailures.labels(queue.queueName, queue.queueName).inc()
-              Tags.ERROR.set(span, true)
-              Status.FAILED
+              // Run the handler and record timing
+              try {
+                val (duration, _) = timed { handler.handleJob(message) }
+                metrics.handlerDispatchTime.record(
+                  duration.toMillis().toDouble(), queue.queueName,
+                  queue.queueName
+                )
+                Status.OK
+              } catch (th: Throwable) {
+                log.error(th) { "error handling job from ${queue.queueName}" }
+                metrics.handlerFailures.labels(queue.queueName, queue.queueName).inc()
+                Tags.ERROR.set(span, true)
+                Status.FAILED
+              }
             }
-          }
-        }, handlingThreads)
+          },
+          handlingThreads
+        )
       }
     }
   }

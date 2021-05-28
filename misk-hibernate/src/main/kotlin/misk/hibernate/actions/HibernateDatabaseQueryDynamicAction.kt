@@ -13,7 +13,6 @@ import misk.hibernate.actions.HibernateDatabaseQueryWebActionModule.Companion.ch
 import misk.hibernate.actions.HibernateDatabaseQueryWebActionModule.Companion.findDatabaseQueryMetadata
 import misk.hibernate.actions.HibernateDatabaseQueryWebActionModule.Companion.getTransacterForDatabaseQueryAction
 import misk.hibernate.actions.HibernateDatabaseQueryWebActionModule.Companion.validateSelectPathsOrDefault
-import misk.logging.getLogger
 import misk.scope.ActionScoped
 import misk.web.Post
 import misk.web.RequestBody
@@ -21,9 +20,9 @@ import misk.web.RequestContentType
 import misk.web.ResponseContentType
 import misk.web.actions.WebAction
 import misk.web.dashboard.AdminDashboardAccess
-import misk.web.interceptors.LogRequestResponse
 import misk.web.mediatype.MediaTypes
 import misk.web.metadata.database.DatabaseQueryMetadata
+import wisp.logging.getLogger
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlin.reflect.KClass
@@ -88,7 +87,10 @@ internal class HibernateDatabaseQueryDynamicAction @Inject constructor(
       .dynamicQuery(dbEntity)
       .configureDynamic(request, maxRows)
     val selectPaths = validateSelectPathsOrDefault(dbEntity, request.query.select?.paths)
-    logger.info("Query sent from dashboard [principal=$principal][dbEntity=${request.entityClass}][selectPaths=$selectPaths] ${request.query}")
+    logger.info(
+      "Query sent from dashboard [principal=$principal]" +
+        "[dbEntity=${request.entityClass}][selectPaths=$selectPaths] ${request.query}"
+    )
     val rows = configuredQuery.dynamicList(session, selectPaths)
     return Pair(selectPaths, rows)
   }
@@ -105,7 +107,6 @@ internal class HibernateDatabaseQueryDynamicAction @Inject constructor(
       if (ascending == null) throw BadRequestException("Order ascending must be non-null")
       dynamicAddOrder(path = path, asc = ascending)
     }
-
   }
 
   data class Request(

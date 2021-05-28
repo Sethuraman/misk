@@ -11,7 +11,6 @@ import misk.client.HttpClientSSLConfig
 import misk.client.HttpClientsConfig
 import misk.inject.KAbstractModule
 import misk.inject.getInstance
-import misk.logging.LogCollector
 import misk.logging.LogCollectorModule
 import misk.scope.ActionScoped
 import misk.security.ssl.SslLoader
@@ -24,6 +23,7 @@ import misk.web.Response
 import misk.web.ResponseBody
 import misk.web.ResponseContentType
 import misk.web.WebActionModule
+import misk.web.WebServerTestingModule
 import misk.web.WebTestingModule
 import misk.web.actions.WebAction
 import misk.web.interceptors.MetricsInterceptor
@@ -39,6 +39,7 @@ import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
+import wisp.logging.LogCollector
 import java.io.IOException
 import java.net.SocketTimeoutException
 import java.util.concurrent.TimeUnit
@@ -71,9 +72,11 @@ class Http2ConnectivityTest {
 
   @Test
   fun happyPath() {
-    val call = client.newCall(Request.Builder()
+    val call = client.newCall(
+      Request.Builder()
         .url(jetty.httpsServerUrl!!.resolve("/hello")!!)
-        .build())
+        .build()
+    )
     val response = call.execute()
     response.use {
       assertThat(response.protocol).isEqualTo(Protocol.HTTP_2)
@@ -84,12 +87,14 @@ class Http2ConnectivityTest {
   @Test
   fun http1ForClientsThatPreferIt() {
     val http1Client = client.newBuilder()
-        .protocols(listOf(Protocol.HTTP_1_1))
-        .build()
+      .protocols(listOf(Protocol.HTTP_1_1))
+      .build()
 
-    val call = http1Client.newCall(Request.Builder()
+    val call = http1Client.newCall(
+      Request.Builder()
         .url(jetty.httpsServerUrl!!.resolve("/hello")!!)
-        .build())
+        .build()
+    )
     val response = call.execute()
     response.use {
       assertThat(response.protocol).isEqualTo(Protocol.HTTP_1_1)
@@ -99,9 +104,11 @@ class Http2ConnectivityTest {
 
   @Test
   fun http1ForCleartext() {
-    val call = client.newCall(Request.Builder()
+    val call = client.newCall(
+      Request.Builder()
         .url(jetty.httpServerUrl.resolve("/hello")!!)
-        .build())
+        .build()
+    )
     val response = call.execute()
     response.use {
       assertThat(response.protocol).isEqualTo(Protocol.HTTP_1_1)
@@ -113,11 +120,13 @@ class Http2ConnectivityTest {
   @Test
   fun disconnectWithEmptyResponse() {
     client = client.newBuilder()
-        .retryOnConnectionFailure(false)
-        .build()
-    val call = client.newCall(Request.Builder()
+      .retryOnConnectionFailure(false)
+      .build()
+    val call = client.newCall(
+      Request.Builder()
         .url(jetty.httpsServerUrl!!.resolve("/disconnect/empty")!!)
-        .build())
+        .build()
+    )
     assertFailsWith<IOException> {
       call.execute()
     }
@@ -127,11 +136,13 @@ class Http2ConnectivityTest {
   @Test
   fun disconnectWithLargeResponse() {
     client = client.newBuilder()
-        .retryOnConnectionFailure(false)
-        .build()
-    val call = client.newCall(Request.Builder()
+      .retryOnConnectionFailure(false)
+      .build()
+    val call = client.newCall(
+      Request.Builder()
         .url(jetty.httpsServerUrl!!.resolve("/disconnect/large")!!)
-        .build())
+        .build()
+    )
     assertFailsWith<IOException> {
       call.execute()
     }
@@ -141,23 +152,26 @@ class Http2ConnectivityTest {
   @Test
   fun clientTimeoutWritingTheRequest() {
     val http1Client = client.newBuilder()
-        .protocols(listOf(Protocol.HTTP_1_1))
-        .writeTimeout(1, TimeUnit.MILLISECONDS)
-        .build()
+      .protocols(listOf(Protocol.HTTP_1_1))
+      .writeTimeout(1, TimeUnit.MILLISECONDS)
+      .build()
     val requestBody = object : RequestBody() {
       override fun contentType() = "text/plain;charset=utf-8".toMediaType()
 
       override fun writeTo(sink: BufferedSink) {
+        Thread.sleep(1000L)
         for (i in 0 until 1024 * 1024) {
           sink.writeUtf8("impossible: $i\n")
         }
       }
     }
 
-    val call = http1Client.newCall(Request.Builder()
+    val call = http1Client.newCall(
+      Request.Builder()
         .url(jetty.httpsServerUrl!!.resolve("/large/request")!!)
         .post(requestBody)
-        .build())
+        .build()
+    )
 
     assertFailsWith<SocketTimeoutException> {
       call.execute()
@@ -193,7 +207,7 @@ class Http2ConnectivityTest {
       val request = actionScopedServletRequest.get() as org.eclipse.jetty.server.Request
       request.httpChannel.abort(Exception("boom")) // Synthesize a connectivity failure.
 
-      return object: ResponseBody {
+      return object : ResponseBody {
         override fun writeTo(sink: BufferedSink) {
           for (i in 0 until 1024 * 1024) {
             sink.writeUtf8("impossible\n")
@@ -204,8 +218,7 @@ class Http2ConnectivityTest {
   }
 
   /** Large requests fail later. */
-  class DisconnectWithLargeRequestAction @Inject constructor(
-  ) : WebAction {
+  class DisconnectWithLargeRequestAction @Inject constructor() : WebAction {
     @Post("/large/request")
     @ResponseContentType(MediaTypes.TEXT_PLAIN_UTF8)
     fun disconnect(@misk.web.RequestBody body: String): Response<String> {
@@ -216,9 +229,14 @@ class Http2ConnectivityTest {
   class TestModule : KAbstractModule() {
     override fun configure() {
       install(LogCollectorModule())
-      install(WebTestingModule(webConfig = WebTestingModule.TESTING_WEB_CONFIG.copy(
-          http2 = true
-      )))
+      install(
+        WebServerTestingModule(
+          webConfig = WebServerTestingModule.TESTING_WEB_CONFIG.copy(
+            http2 = true
+          )
+        )
+      )
+      install(MiskTestingServiceModule())
       install(WebActionModule.create<HelloAction>())
       install(WebActionModule.create<DisconnectWithEmptyResponseAction>())
       install(WebActionModule.create<DisconnectWithLargeResponseAction>())
@@ -238,20 +256,20 @@ class Http2ConnectivityTest {
     @Singleton
     fun provideHttpClientsConfig(): HttpClientsConfig {
       return HttpClientsConfig(
-          endpoints = mapOf(
-              "default" to HttpClientEndpointConfig(
-                  url = "http://example.com/",
-                  clientConfig = HttpClientConfig(
-                      ssl = HttpClientSSLConfig(
-                          cert_store = null,
-                          trust_store = TrustStoreConfig(
-                              resource = "classpath:/ssl/server_cert.pem",
-                              format = SslLoader.FORMAT_PEM
-                          )
-                      )
-                  )
+        endpoints = mapOf(
+          "default" to HttpClientEndpointConfig(
+            url = "http://example.com/",
+            clientConfig = HttpClientConfig(
+              ssl = HttpClientSSLConfig(
+                cert_store = null,
+                trust_store = TrustStoreConfig(
+                  resource = "classpath:/ssl/server_cert.pem",
+                  format = SslLoader.FORMAT_PEM
+                )
               )
+            )
           )
+        )
       )
     }
   }

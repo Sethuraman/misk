@@ -1,6 +1,7 @@
 package misk.web
 
 import com.google.inject.util.Modules
+import misk.MiskTestingServiceModule
 import misk.concurrent.ExecutorServiceFactory
 import misk.inject.KAbstractModule
 import misk.testing.MiskTest
@@ -41,18 +42,19 @@ internal class JettyHealthCheckTest {
     val executor = executorFactory.unbounded("testing")
     val httpClient = OkHttpClient()
     val request = Request.Builder()
-        .get()
-        .url(httpUrlBuilder().encodedPath("/block").build())
-        .build()
+      .get()
+      .url(httpUrlBuilder().encodedPath("/block").build())
+      .build()
     val healthRequest = Request.Builder()
-        .get()
-        .url(healthUrlBuilder().encodedPath("/health").build())
-        .build()
+      .get()
+      .url(healthUrlBuilder().encodedPath("/health").build())
+      .build()
 
     // exhaust the thread pool
     val responses = mutableListOf<Future<Response>>()
     // Unfortunately the # of threads vary locally vs CI and it's not clear why, so dynamically compute.
-    val parallelRequests = (threadPool as ExecutorThreadPool).maxThreads - threadPool.threads + threadPool.idleThreads
+    val parallelRequests =
+      (threadPool as ExecutorThreadPool).maxThreads - threadPool.threads + threadPool.idleThreads
     requestsPhaser.bulkRegister(parallelRequests + 1)
     // Jetty can be flaky on rejecting a request, so ensure we have exhausted the thread pool.
     while (requestsPhaser.arrivedParties < parallelRequests) {
@@ -64,7 +66,7 @@ internal class JettyHealthCheckTest {
 
     // verify all threads are busy
     assertThatThrownBy { httpClient.newCall(request).execute() }
-        .isInstanceOf(IOException::class.java)
+      .isInstanceOf(IOException::class.java)
 
     val healthResponses = mutableListOf<Future<Response>>()
     // make sure we can check liveness and readiness in parallel
@@ -104,20 +106,28 @@ internal class JettyHealthCheckTest {
 
   internal class TestModule : KAbstractModule() {
     override fun configure() {
-      install(Modules.override(WebTestingModule()).with(
+      install(
+        Modules.override(WebServerTestingModule()).with(
           object : KAbstractModule() {
             override fun configure() {
-              val pool = ExecutorThreadPool(ThreadPoolExecutor(
+              val pool = ExecutorThreadPool(
+                ThreadPoolExecutor(
                   // There is some flakiness in Jetty startup when it eagerly creates core threads
                   // and those core threads are not available to be used. Just lazily create for tests.
                   0,
                   10,
                   60, TimeUnit.SECONDS,
-                  SynchronousQueue()), 0)
+                  SynchronousQueue()
+                ),
+                0
+              )
               bind<ThreadPool>().toInstance(pool)
             }
           }
-      ))
+        )
+      )
+      install(MiskTestingServiceModule())
+
       install(WebActionModule.create<BlockingAction>())
       install(WebActionModule.create<HealthAction>())
       bind<Phaser>().annotatedWith<Requests>().toInstance(Phaser())

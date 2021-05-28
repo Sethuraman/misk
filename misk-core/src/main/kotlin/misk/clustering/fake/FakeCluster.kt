@@ -4,7 +4,7 @@ import misk.clustering.Cluster
 import misk.clustering.ClusterService
 import misk.clustering.ClusterWatch
 import misk.clustering.DefaultCluster
-import misk.logging.getLogger
+import wisp.logging.getLogger
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import javax.inject.Inject
@@ -24,11 +24,13 @@ class FakeCluster internal constructor(
   private val delegate: DefaultCluster
 ) : ClusterService by delegate, Cluster by delegate {
   constructor(resourceMapper: ExplicitClusterResourceMapper) :
-      this(resourceMapper, DefaultCluster(self) { resourceMapper })
+    this(resourceMapper, DefaultCluster(self) { resourceMapper })
 
-  @Inject constructor() : this(ExplicitClusterResourceMapper().apply {
-    setDefaultMapping(self)
-  })
+  @Inject constructor() : this(
+    ExplicitClusterResourceMapper().apply {
+      setDefaultMapping(self)
+    }
+  )
 
   override fun watch(watch: ClusterWatch) {
     waitFor {

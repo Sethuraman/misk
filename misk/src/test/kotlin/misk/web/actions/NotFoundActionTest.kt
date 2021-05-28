@@ -1,6 +1,7 @@
 package misk.web.actions
 
 import com.squareup.moshi.Moshi
+import misk.MiskTestingServiceModule
 import misk.inject.KAbstractModule
 import misk.testing.MiskTest
 import misk.testing.MiskTestModule
@@ -9,6 +10,7 @@ import misk.web.RequestBody
 import misk.web.RequestContentType
 import misk.web.ResponseContentType
 import misk.web.WebActionModule
+import misk.web.WebServerTestingModule
 import misk.web.WebTestingModule
 import misk.web.jetty.JettyService
 import misk.web.mediatype.MediaTypes
@@ -88,11 +90,13 @@ class NotFoundActionTest {
     val response = httpClient.newCall(request).execute()
     assertThat(response.code).isEqualTo(404)
   }
+
   @Test fun responseMessageSuggestsAlternativeMethod() {
     val wrongMethod = get("/echo", plainTextMediaType)
     val response = httpClient.newCall(wrongMethod).execute()
     assertThat(response.code).isEqualTo(404)
-    assertThat(response.body!!.source().readUtf8()).isEqualTo("""
+    assertThat(response.body!!.source().readUtf8()).isEqualTo(
+      """
       |Nothing found at /echo.
       |
       |Received:
@@ -103,14 +107,16 @@ class NotFoundActionTest {
       |POST /echo
       |Accept: text/plain;charset=utf-8
       |Content-Type: text/plain;charset=utf-8
-      |""".trimMargin())
+      |""".trimMargin()
+    )
   }
 
   @Test fun responseMessageSuggestsContentType() {
     val wrongContentType = post("/echo", weirdMediaType, "hello")
     val response = httpClient.newCall(wrongContentType).execute()
     assertThat(response.code).isEqualTo(404)
-    assertThat(response.body!!.source().readUtf8()).isEqualTo("""
+    assertThat(response.body!!.source().readUtf8()).isEqualTo(
+      """
       |Nothing found at /echo.
       |
       |Received:
@@ -122,14 +128,16 @@ class NotFoundActionTest {
       |POST /echo
       |Accept: text/plain;charset=utf-8
       |Content-Type: text/plain;charset=utf-8
-      |""".trimMargin())
+      |""".trimMargin()
+    )
   }
 
   @Test fun responseMessageSuggestsAcceptType() {
     val wrongAccept = post("/echo", plainTextMediaType, "hello", weirdMediaType)
     val response = httpClient.newCall(wrongAccept).execute()
     assertThat(response.code).isEqualTo(404)
-    assertThat(response.body!!.source().readUtf8()).isEqualTo("""
+    assertThat(response.body!!.source().readUtf8()).isEqualTo(
+      """
       |Nothing found at /echo.
       |
       |Received:
@@ -141,23 +149,24 @@ class NotFoundActionTest {
       |POST /echo
       |Accept: text/plain;charset=utf-8
       |Content-Type: text/plain;charset=utf-8
-      |""".trimMargin())
+      |""".trimMargin()
+    )
   }
 
   private fun head(path: String, acceptedMediaType: MediaType? = null): Request {
     return Request.Builder()
-        .head()
-        .url(jettyService.httpServerUrl.newBuilder().encodedPath(path).build())
-        .header("Accept", acceptedMediaType.toString())
-        .build()
+      .head()
+      .url(jettyService.httpServerUrl.newBuilder().encodedPath(path).build())
+      .header("Accept", acceptedMediaType.toString())
+      .build()
   }
 
   private fun get(path: String, acceptedMediaType: MediaType? = null): Request {
     return Request.Builder()
-        .get()
-        .url(jettyService.httpServerUrl.newBuilder().encodedPath(path).build())
-        .header("Accept", acceptedMediaType.toString())
-        .build()
+      .get()
+      .url(jettyService.httpServerUrl.newBuilder().encodedPath(path).build())
+      .header("Accept", acceptedMediaType.toString())
+      .build()
   }
 
   private fun post(
@@ -167,19 +176,20 @@ class NotFoundActionTest {
     acceptedMediaType: MediaType? = null
   ): Request {
     return Request.Builder()
-        .post(content.toRequestBody(contentType))
-        .url(jettyService.httpServerUrl.newBuilder().encodedPath(path).build())
-        .apply {
-          if (acceptedMediaType != null) {
-            header("Accept", acceptedMediaType.toString())
-          }
+      .post(content.toRequestBody(contentType))
+      .url(jettyService.httpServerUrl.newBuilder().encodedPath(path).build())
+      .apply {
+        if (acceptedMediaType != null) {
+          header("Accept", acceptedMediaType.toString())
         }
-        .build()
+      }
+      .build()
   }
 
   class TestModule : KAbstractModule() {
     override fun configure() {
-      install(WebTestingModule())
+      install(WebServerTestingModule())
+      install(MiskTestingServiceModule())
       install(WebActionModule.create<EchoAction>())
       install(WebActionModule.create<EchoFooAction>())
     }

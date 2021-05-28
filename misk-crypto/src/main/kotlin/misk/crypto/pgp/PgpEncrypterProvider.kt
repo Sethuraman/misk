@@ -18,9 +18,9 @@ internal class PgpEncrypterProvider(
 
   override fun get(): PgpEncrypter {
     val key = getRawKey(alias)
-    val keyIn = BufferedInputStream(key.encrypted_key.value.byteInputStream())
+    val keyIn = BufferedInputStream(key.encrypted_key!!.value.byteInputStream())
     val pgpPub =
-        PGPPublicKeyRingCollection(PGPUtil.getDecoderStream(keyIn), JcaKeyFingerprintCalculator())
+      PGPPublicKeyRingCollection(PGPUtil.getDecoderStream(keyIn), JcaKeyFingerprintCalculator())
 
     // While there may be several subkeys we want specifically the subkey for encryption.
     var encryptionKey: PGPPublicKey? = null

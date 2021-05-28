@@ -1,5 +1,6 @@
 package misk.web
 
+import misk.MiskTestingServiceModule
 import misk.inject.KAbstractModule
 import misk.scope.ActionScoped
 import misk.scope.ActionScopedProvider
@@ -26,11 +27,13 @@ internal class ActionScopedWebDispatchTest {
   @Test
   fun exposesActionScopedInInterceptors() {
     val httpClient = OkHttpClient()
-    val response = httpClient.newCall(okhttp3.Request.Builder()
+    val response = httpClient.newCall(
+      okhttp3.Request.Builder()
         .url(jettyService.httpServerUrl.newBuilder().encodedPath("/hello").build())
         .addHeader("Security-ID", "Thor")
-        .build())
-        .execute()
+        .build()
+    )
+      .execute()
     assertThat(response.code).isEqualTo(200)
     assertThat(response.body!!.string()).isEqualTo("hello Thor")
   }
@@ -55,7 +58,8 @@ internal class ActionScopedWebDispatchTest {
 
   class TestModule : KAbstractModule() {
     override fun configure() {
-      install(WebTestingModule())
+      install(WebServerTestingModule())
+      install(MiskTestingServiceModule())
       install(WebActionModule.create<Hello>())
       install(object : ActionScopedProviderModule() {
         override fun configureProviders() {

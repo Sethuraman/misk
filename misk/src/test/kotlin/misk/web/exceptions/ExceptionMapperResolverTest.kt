@@ -2,6 +2,7 @@ package misk.web.exceptions
 
 import misk.exceptions.ActionException
 import misk.exceptions.NotFoundException
+import misk.exceptions.WebActionException
 import misk.web.Response
 import misk.web.ResponseBody
 import org.assertj.core.api.Assertions.assertThat
@@ -19,21 +20,21 @@ internal class ExceptionMapperResolverTest {
     mappers[ActionException::class] = ActionExceptionMapper()
 
     assertThat(resolver.mapperFor(NotFoundException()))
-        .isInstanceOf(NotFoundExceptionMapper::class.java)
+      .isInstanceOf(NotFoundExceptionMapper::class.java)
   }
 
   @Test
   fun resolvesToSuperClassMapper() {
-    mappers[ActionException::class] = ActionExceptionMapper()
+    mappers[WebActionException::class] = WebActionExceptionMapper()
 
     assertThat(resolver.mapperFor(NotFoundException()))
-        .isInstanceOf(ActionExceptionMapper::class.java)
+      .isInstanceOf(WebActionExceptionMapper::class.java)
   }
 
   @Test
   fun noMapperFound() {
     assertThat(resolver.mapperFor(NotFoundException()))
-        .isNull()
+      .isNull()
   }
 
   @Test
@@ -41,12 +42,13 @@ internal class ExceptionMapperResolverTest {
     mappers[ArithmeticException::class] = ArithmeticExceptionMapper()
 
     assertThat(resolver.mapperFor(ArithmeticException()))
-        .isInstanceOf(ArithmeticExceptionMapper::class.java)
+      .isInstanceOf(ArithmeticExceptionMapper::class.java)
   }
 
   class NotFoundExceptionMapper : BaseExceptionMapper<NotFoundException>()
   class ActionExceptionMapper : BaseExceptionMapper<ActionException>()
   class ArithmeticExceptionMapper : BaseExceptionMapper<ArithmeticException>()
+  class WebActionExceptionMapper : BaseExceptionMapper<WebActionException>()
 
   open class BaseExceptionMapper<in T : Throwable> : ExceptionMapper<T> {
     override fun toResponse(th: T): Response<ResponseBody> {

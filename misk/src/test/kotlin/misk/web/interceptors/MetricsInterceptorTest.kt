@@ -1,5 +1,6 @@
 package misk.web.interceptors
 
+import misk.MiskTestingServiceModule
 import misk.inject.KAbstractModule
 import misk.security.authz.AccessControlModule
 import misk.security.authz.FakeCallerAuthenticator
@@ -13,6 +14,7 @@ import misk.web.Get
 import misk.web.PathParam
 import misk.web.Response
 import misk.web.WebActionModule
+import misk.web.WebServerTestingModule
 import misk.web.WebTestingModule
 import misk.web.actions.WebAction
 import misk.web.jetty.JettyService
@@ -49,20 +51,20 @@ class MetricsInterceptorTest {
   @Test
   fun responseCodes() {
     val requestDuration = metricsInterceptorFactory.requestDuration
-    requestDuration.record(1.0, "TestAction", "unknown", "200")
-    assertThat(requestDuration.count("TestAction", "unknown", "200")).isEqualTo(3)
-    requestDuration.record(1.0, "TestAction", "unknown", "202")
-    assertThat(requestDuration.count("TestAction", "unknown", "202")).isEqualTo(2)
-    requestDuration.record(1.0, "TestAction", "unknown", "404")
-    assertThat(requestDuration.count("TestAction", "unknown", "404")).isEqualTo(2)
-    requestDuration.record(1.0, "TestAction", "unknown", "403")
-    assertThat(requestDuration.count("TestAction", "unknown", "403")).isEqualTo(3)
+    requestDuration.record(1.0, "MetricsInterceptorTestAction", "unknown", "200")
+    assertThat(requestDuration.count("MetricsInterceptorTestAction", "unknown", "200")).isEqualTo(3)
+    requestDuration.record(1.0, "MetricsInterceptorTestAction", "unknown", "202")
+    assertThat(requestDuration.count("MetricsInterceptorTestAction", "unknown", "202")).isEqualTo(2)
+    requestDuration.record(1.0, "MetricsInterceptorTestAction", "unknown", "404")
+    assertThat(requestDuration.count("MetricsInterceptorTestAction", "unknown", "404")).isEqualTo(2)
+    requestDuration.record(1.0, "MetricsInterceptorTestAction", "unknown", "403")
+    assertThat(requestDuration.count("MetricsInterceptorTestAction", "unknown", "403")).isEqualTo(3)
 
-    requestDuration.record(1.0, "TestAction", "my-peer", "200")
-    assertThat(requestDuration.count("TestAction", "my-peer", "200")).isEqualTo(5)
+    requestDuration.record(1.0, "MetricsInterceptorTestAction", "my-peer", "200")
+    assertThat(requestDuration.count("MetricsInterceptorTestAction", "my-peer", "200")).isEqualTo(5)
 
-    requestDuration.record(1.0, "TestAction", "<user>", "200")
-    assertThat(requestDuration.count("TestAction", "<user>", "200")).isEqualTo(2)
+    requestDuration.record(1.0, "MetricsInterceptorTestAction", "<user>", "200")
+    assertThat(requestDuration.count("MetricsInterceptorTestAction", "<user>", "200")).isEqualTo(2)
   }
 
   fun invoke(
@@ -71,33 +73,34 @@ class MetricsInterceptorTest {
     user: String? = null
   ): okhttp3.Response {
     val url = jettyService.httpServerUrl.newBuilder()
-        .encodedPath("/call/$desiredStatusCode")
-        .build()
+      .encodedPath("/call/$desiredStatusCode")
+      .build()
 
     val request = okhttp3.Request.Builder()
-        .url(url)
-        .get()
+      .url(url)
+      .get()
     service?.let { request.addHeader(SERVICE_HEADER, it) }
     user?.let { request.addHeader(USER_HEADER, it) }
     return httpClient.newCall(request.build()).execute()
   }
 
-  internal class TestAction @Inject constructor() : WebAction {
-    @Get("/call/{desiredStatusCode}")
-    @Unauthenticated
-    fun call(@PathParam desiredStatusCode: Int): Response<String> {
-      return Response("foo", statusCode = desiredStatusCode)
-    }
-  }
-
   class TestModule : KAbstractModule() {
     override fun configure() {
       install(AccessControlModule())
-      install(WebTestingModule())
+      install(WebServerTestingModule())
+      install(MiskTestingServiceModule())
       multibind<MiskCallerAuthenticator>().to<FakeCallerAuthenticator>()
-      install(WebActionModule.create<TestAction>())
+      install(WebActionModule.create<MetricsInterceptorTestAction>())
 
       bind<MetricsInterceptor.Factory>()
     }
+  }
+}
+
+internal class MetricsInterceptorTestAction @Inject constructor() : WebAction {
+  @Get("/call/{desiredStatusCode}")
+  @Unauthenticated
+  fun call(@PathParam desiredStatusCode: Int): Response<String> {
+    return Response("foo", statusCode = desiredStatusCode)
   }
 }

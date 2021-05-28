@@ -1,7 +1,7 @@
 package misk.web
 
+import misk.MiskTestingServiceModule
 import misk.inject.KAbstractModule
-import misk.logging.LogCollector
 import misk.logging.LogCollectorModule
 import misk.testing.MiskTest
 import misk.testing.MiskTestModule
@@ -16,6 +16,7 @@ import okhttp3.Request
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
+import wisp.logging.LogCollector
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -34,8 +35,8 @@ internal class WebSocketsTest {
     val client = OkHttpClient()
 
     val request = Request.Builder()
-        .url(jettyService.httpServerUrl.resolve("/echo")!!)
-        .build()
+      .url(jettyService.httpServerUrl.resolve("/echo")!!)
+      .build()
 
     val webSocket = client.newWebSocket(request, listener)
 
@@ -44,30 +45,32 @@ internal class WebSocketsTest {
 
     // Confirm interceptors were invoked.
     assertThat(logCollector.takeMessage(RequestLoggingInterceptor::class)).matches(
-      "EchoWebSocket principal=unknown time=0.000 ns code=200 request=\\[JettyWebSocket\\[.* to /echo]] response=EchoListener"
+      "EchoWebSocket principal=unknown time=0.000 ns code=200 " +
+        "request=\\[JettyWebSocket\\[.* to /echo]] response=EchoListener"
     )
-  }
-
-  @Singleton
-  class EchoWebSocket @Inject constructor() : WebAction {
-    @ConnectWebSocket("/echo")
-    @LogRequestResponse(bodySampling = 1.0, errorBodySampling = 1.0)
-    fun echo(@Suppress("UNUSED_PARAMETER") webSocket: WebSocket): WebSocketListener {
-      return object : WebSocketListener() {
-        override fun onMessage(webSocket: WebSocket, text: String) {
-          webSocket.send("ACK $text")
-        }
-
-        override fun toString() = "EchoListener"
-      }
-    }
   }
 
   class TestModule : KAbstractModule() {
     override fun configure() {
-      install(WebTestingModule())
+      install(WebServerTestingModule())
+      install(MiskTestingServiceModule())
       install(LogCollectorModule())
       install(WebActionModule.create<EchoWebSocket>())
+    }
+  }
+}
+
+@Singleton
+class EchoWebSocket @Inject constructor() : WebAction {
+  @ConnectWebSocket("/echo")
+  @LogRequestResponse(bodySampling = 1.0, errorBodySampling = 1.0)
+  fun echo(@Suppress("UNUSED_PARAMETER") webSocket: WebSocket): WebSocketListener {
+    return object : WebSocketListener() {
+      override fun onMessage(webSocket: WebSocket, text: String) {
+        webSocket.send("ACK $text")
+      }
+
+      override fun toString() = "EchoListener"
     }
   }
 }

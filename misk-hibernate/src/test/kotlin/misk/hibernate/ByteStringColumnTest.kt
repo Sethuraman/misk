@@ -1,7 +1,6 @@
 package misk.hibernate
 
 import misk.MiskTestingServiceModule
-import misk.config.Config
 import misk.config.MiskConfig
 import misk.environment.Environment
 import misk.environment.EnvironmentModule
@@ -14,6 +13,7 @@ import okio.ByteString.Companion.decodeHex
 import okio.ByteString.Companion.encodeUtf8
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
+import wisp.config.Config
 import javax.inject.Inject
 import javax.inject.Qualifier
 import javax.persistence.Column
@@ -39,8 +39,8 @@ class ByteStringColumnTest {
     }
     transacter.transaction { session ->
       val textHash = queryFactory.newQuery(TextHashQuery::class)
-          .hash(abcHash)
-          .uniqueResult(session)!!
+        .hash(abcHash)
+        .uniqueResult(session)!!
       assertThat(textHash.text).isEqualTo("abc")
       assertThat(textHash.hash).isEqualTo(abcHash)
     }
@@ -61,26 +61,36 @@ class ByteStringColumnTest {
     }
 
     transacter.transaction { session ->
-      assertThat(queryFactory.newQuery<TextHashQuery>()
+      assertThat(
+        queryFactory.newQuery<TextHashQuery>()
           .hashLessThan(v1.hash)
-          .listAsTextAndHash(session))
-          .isEmpty()
-      assertThat(queryFactory.newQuery<TextHashQuery>()
+          .listAsTextAndHash(session)
+      )
+        .isEmpty()
+      assertThat(
+        queryFactory.newQuery<TextHashQuery>()
           .hashLessThan(v2.hash)
-          .listAsTextAndHash(session))
-          .containsExactly(v1)
-      assertThat(queryFactory.newQuery<TextHashQuery>()
+          .listAsTextAndHash(session)
+      )
+        .containsExactly(v1)
+      assertThat(
+        queryFactory.newQuery<TextHashQuery>()
           .hashLessThan(v3.hash)
-          .listAsTextAndHash(session))
-          .containsExactly(v1, v2)
-      assertThat(queryFactory.newQuery<TextHashQuery>()
+          .listAsTextAndHash(session)
+      )
+        .containsExactly(v1, v2)
+      assertThat(
+        queryFactory.newQuery<TextHashQuery>()
           .hashLessThan(v4.hash)
-          .listAsTextAndHash(session))
-          .containsExactly(v1, v2, v3)
-      assertThat(queryFactory.newQuery<TextHashQuery>()
+          .listAsTextAndHash(session)
+      )
+        .containsExactly(v1, v2, v3)
+      assertThat(
+        queryFactory.newQuery<TextHashQuery>()
           .hashLessThan("ff00".decodeHex())
-          .listAsTextAndHash(session))
-          .containsExactly(v1, v2, v3, v4)
+          .listAsTextAndHash(session)
+      )
+        .containsExactly(v1, v2, v3, v4)
     }
   }
 

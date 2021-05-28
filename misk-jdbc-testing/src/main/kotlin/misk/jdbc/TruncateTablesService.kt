@@ -2,10 +2,10 @@ package misk.jdbc
 
 import com.google.common.base.Stopwatch
 import com.google.common.util.concurrent.AbstractIdleService
-import misk.logging.getLogger
 import misk.vitess.shards
 import misk.vitess.target
-import java.util.Locale
+import wisp.logging.getLogger
+import java.util.*
 import javax.inject.Provider
 import kotlin.reflect.KClass
 
@@ -48,7 +48,7 @@ class TruncateTablesService(
             val config = dataSourceService.config()
             val tableNamesQuery = when (config.type) {
               DataSourceType.MYSQL, DataSourceType.TIDB -> {
-                "SELECT table_name FROM information_schema.tables where table_schema='${config.database}'"
+                "SELECT table_name FROM information_schema.tables where table_schema='${config.database}' AND table_type='BASE TABLE'"
               }
               DataSourceType.HSQLDB -> {
                 "SELECT TABLE_NAME FROM INFORMATION_SCHEMA.SYSTEM_TABLES WHERE TABLE_TYPE='TABLE'"
@@ -91,7 +91,7 @@ class TruncateTablesService(
     if (truncatedTableNames.isNotEmpty()) {
       logger.info {
         "@${qualifier.simpleName} TruncateTablesService truncated ${truncatedTableNames.size} " +
-            "tables in $stopwatch"
+          "tables in $stopwatch"
       }
     }
   }
@@ -112,7 +112,7 @@ class TruncateTablesService(
     if (statements.isNotEmpty()) {
       logger.info {
         "@${qualifier.simpleName} TruncateTablesService ran ${statements.size} $name " +
-            "statements in $stopwatch"
+          "statements in $stopwatch"
       }
     }
   }

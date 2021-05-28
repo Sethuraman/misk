@@ -1,7 +1,7 @@
 package misk.service
 
 import com.google.common.util.concurrent.AbstractIdleService
-import misk.logging.getLogger
+import wisp.logging.getLogger
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicBoolean
 
@@ -47,10 +47,12 @@ abstract class CachedTestService : AbstractIdleService() {
     if (serviceBool.compareAndSet(false, true)) {
       log.info { "starting $javaClass.name" }
       actualStartup()
-      Runtime.getRuntime().addShutdownHook(Thread {
-        log.info { "stopping $javaClass.name" }
-        actualShutdown()
-      })
+      Runtime.getRuntime().addShutdownHook(
+        Thread {
+          log.info { "stopping $javaClass.name" }
+          actualShutdown()
+        }
+      )
     } else {
       log.info { "$javaClass.name already running, not starting anything" }
     }

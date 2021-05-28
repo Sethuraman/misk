@@ -1,5 +1,6 @@
 package misk.web.actions
 
+import misk.MiskTestingServiceModule
 import misk.inject.KAbstractModule
 import misk.testing.MiskTest
 import misk.testing.MiskTestModule
@@ -10,6 +11,7 @@ import misk.web.Post
 import misk.web.Put
 import misk.web.Response
 import misk.web.WebActionModule
+import misk.web.WebServerTestingModule
 import misk.web.WebTestingModule
 import misk.web.jetty.JettyService
 import misk.web.mediatype.MediaTypes
@@ -33,9 +35,9 @@ class SupportedHttpMethodsTest {
   @Test
   fun get() {
     val request = Request.Builder()
-        .get()
-        .url(jettyService.httpServerUrl.newBuilder().encodedPath("/resources/id").build())
-        .build()
+      .get()
+      .url(jettyService.httpServerUrl.newBuilder().encodedPath("/resources/id").build())
+      .build()
 
     val response = httpClient.newCall(request).execute()
     assertThat(response.isSuccessful).isTrue()
@@ -45,9 +47,9 @@ class SupportedHttpMethodsTest {
   @Test
   fun post() {
     val request = Request.Builder()
-        .post("new resource".toRequestBody(MediaTypes.TEXT_PLAIN_UTF8_MEDIA_TYPE))
-        .url(jettyService.httpServerUrl.newBuilder().encodedPath("/resources").build())
-        .build()
+      .post("new resource".toRequestBody(MediaTypes.TEXT_PLAIN_UTF8_MEDIA_TYPE))
+      .url(jettyService.httpServerUrl.newBuilder().encodedPath("/resources").build())
+      .build()
 
     val response = httpClient.newCall(request).execute()
     assertThat(response.isSuccessful).isTrue()
@@ -57,9 +59,9 @@ class SupportedHttpMethodsTest {
   @Test
   fun patch() {
     val request = Request.Builder()
-        .patch("updated resource".toRequestBody(MediaTypes.TEXT_PLAIN_UTF8_MEDIA_TYPE))
-        .url(jettyService.httpServerUrl.newBuilder().encodedPath("/resources/id").build())
-        .build()
+      .patch("updated resource".toRequestBody(MediaTypes.TEXT_PLAIN_UTF8_MEDIA_TYPE))
+      .url(jettyService.httpServerUrl.newBuilder().encodedPath("/resources/id").build())
+      .build()
 
     val response = httpClient.newCall(request).execute()
     assertThat(response.isSuccessful).isTrue()
@@ -69,9 +71,9 @@ class SupportedHttpMethodsTest {
   @Test
   fun put() {
     val request = Request.Builder()
-        .put("update resource".toRequestBody(MediaTypes.TEXT_PLAIN_UTF8_MEDIA_TYPE))
-        .url(jettyService.httpServerUrl.newBuilder().encodedPath("/resources/id").build())
-        .build()
+      .put("update resource".toRequestBody(MediaTypes.TEXT_PLAIN_UTF8_MEDIA_TYPE))
+      .url(jettyService.httpServerUrl.newBuilder().encodedPath("/resources/id").build())
+      .build()
 
     val response = httpClient.newCall(request).execute()
     assertThat(response.isSuccessful).isTrue()
@@ -81,9 +83,9 @@ class SupportedHttpMethodsTest {
   @Test
   fun delete() {
     val request = Request.Builder()
-        .delete()
-        .url(jettyService.httpServerUrl.newBuilder().encodedPath("/resources/id").build())
-        .build()
+      .delete()
+      .url(jettyService.httpServerUrl.newBuilder().encodedPath("/resources/id").build())
+      .build()
 
     val response = httpClient.newCall(request).execute()
     assertThat(response.isSuccessful).isTrue()
@@ -91,7 +93,8 @@ class SupportedHttpMethodsTest {
 
   class TestModule : KAbstractModule() {
     override fun configure() {
-      install(WebTestingModule())
+      install(WebServerTestingModule())
+      install(MiskTestingServiceModule())
       install(WebActionModule.create<GetAction>())
       install(WebActionModule.create<PostAction>())
       install(WebActionModule.create<PatchAction>())

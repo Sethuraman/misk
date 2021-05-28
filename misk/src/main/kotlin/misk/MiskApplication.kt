@@ -8,7 +8,7 @@ import com.google.inject.Guice
 import com.google.inject.Module
 import misk.inject.KAbstractModule
 import misk.inject.getInstance
-import misk.logging.getLogger
+import wisp.logging.getLogger
 
 /** The entry point for misk applications */
 class MiskApplication(private val modules: List<Module>, commands: List<MiskCommand> = listOf()) {
@@ -55,14 +55,17 @@ class MiskApplication(private val modules: List<Module>, commands: List<MiskComm
     try {
       jc.parse(*args)
       val command = commands[jc.parsedCommand]
-          ?: throw ParameterException("unknown command ${jc.parsedCommand}")
+        ?: throw ParameterException("unknown command ${jc.parsedCommand}")
 
-      val injector = Guice.createInjector(object : KAbstractModule() {
-        override fun configure() {
-          bind<JCommander>().toInstance(jc)
-          binder().requireAtInjectOnConstructors()
-        }
-      }, *command.modules.toTypedArray())
+      val injector = Guice.createInjector(
+        object : KAbstractModule() {
+          override fun configure() {
+            bind<JCommander>().toInstance(jc)
+            binder().requireAtInjectOnConstructors()
+          }
+        },
+        *command.modules.toTypedArray()
+      )
 
       injector.injectMembers(command)
       command.run()

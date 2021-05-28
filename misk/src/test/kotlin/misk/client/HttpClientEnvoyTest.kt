@@ -17,6 +17,7 @@ import org.junit.jupiter.api.Test
 import retrofit2.Call
 import retrofit2.http.Body
 import retrofit2.http.POST
+import wisp.client.EnvoyClientEndpointProvider
 import java.io.File
 import java.util.Arrays
 import javax.inject.Inject
@@ -52,7 +53,7 @@ internal class HttpClientEnvoyTest {
     val recordedRequest = server.takeRequest()
     assertThat(recordedRequest.path).isEqualTo("/cooldinos")
     assertThat(recordedRequest.getHeader("Host"))
-        .isEqualTo(String.format("%s:%s", server.hostName, server.port))
+      .isEqualTo(String.format("%s:%s", server.hostName, server.port))
   }
 
   interface DinosaurService {
@@ -62,11 +63,11 @@ internal class HttpClientEnvoyTest {
   class TestEnvoyClientEndpointProvider : EnvoyClientEndpointProvider {
     @Inject private lateinit var webServerService: MockWebServerService
 
-    override fun url(httpClientEnvoyConfig: HttpClientEnvoyConfig): String {
+    override fun url(httpClientEnvoyConfig: wisp.client.HttpClientEnvoyConfig): String {
       return webServerService.server!!.url("").toString()
     }
 
-    override fun unixSocket(httpClientEnvoyConfig: HttpClientEnvoyConfig): File {
+    override fun unixSocket(httpClientEnvoyConfig: wisp.client.HttpClientEnvoyConfig): File {
       return File("@socket")
     }
   }
@@ -85,8 +86,10 @@ internal class HttpClientEnvoyTest {
 
     @Provides @Singleton fun provideHttpClientConfig(): HttpClientsConfig {
       return HttpClientsConfig(
-          endpoints = mapOf(
-              "dinosaur" to HttpClientEndpointConfig(envoy = HttpClientEnvoyConfig("dinosaur"))))
+        endpoints = mapOf(
+          "dinosaur" to HttpClientEndpointConfig(envoy = HttpClientEnvoyConfig("dinosaur"))
+        )
+      )
     }
   }
 }

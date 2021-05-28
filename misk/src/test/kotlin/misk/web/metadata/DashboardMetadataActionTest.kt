@@ -7,15 +7,18 @@ import misk.moshi.adapter
 import misk.security.authz.FakeCallerAuthenticator
 import misk.testing.MiskTest
 import misk.testing.MiskTestModule
-import misk.web.jetty.JettyService
 import misk.web.dashboard.AdminDashboard
+import misk.web.dashboard.MiskWebTheme
+import misk.web.dashboard.MiskWebTheme.Companion.DEFAULT_THEME
 import misk.web.dashboard.ValidWebEntry.Companion.slugify
+import misk.web.jetty.JettyService
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import org.junit.jupiter.api.Test
 import javax.inject.Inject
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 
 @MiskTest(startService = true)
 class DashboardMetadataActionTest {
@@ -26,7 +29,8 @@ class DashboardMetadataActionTest {
   @Inject private lateinit var httpClientFactory: HttpClientFactory
   @Inject private lateinit var moshi: Moshi
 
-  private inline fun <reified A: Annotation>asDashboardPath() = "/api/dashboard/${slugify<A>()}/metadata"
+  private inline fun <reified A : Annotation> asDashboardPath() =
+    "/api/dashboard/${slugify<A>()}/metadata"
 
   @Test fun `admin dashboard unauthenticated tabs`() {
     val response = executeRequest(path = asDashboardPath<AdminDashboard>())
@@ -48,7 +52,6 @@ class DashboardMetadataActionTest {
       user = "sandy",
       capabilities = "admin_access"
     )
-    assertEquals(2, response.dashboardMetadata.tabs.size)
     assertNotNull(response.dashboardMetadata.tabs.find { it.name == "Database" })
     assertNotNull(response.dashboardMetadata.tabs.find { it.name == "Web Actions" })
   }
@@ -70,8 +73,10 @@ class DashboardMetadataActionTest {
       capabilities = "test_admin_access"
     )
     assertEquals(1, response.dashboardMetadata.navbar_items.size)
-    assertEquals("<a href=\"https://cash.app/\">Test Navbar Link</a>",
-      response.dashboardMetadata.navbar_items.first())
+    assertEquals(
+      "<a href=\"https://cash.app/\">Test Navbar Link</a>",
+      response.dashboardMetadata.navbar_items.first()
+    )
   }
 
   @Test fun `test dashboard navbar status`() {
@@ -90,6 +95,15 @@ class DashboardMetadataActionTest {
       capabilities = "test_admin_access"
     )
     assertEquals("/test-app/", response.dashboardMetadata.home_url)
+  }
+
+  @Test fun `test dashboard custom theme`() {
+    val response = executeRequest(
+      path = asDashboardPath<DashboardMetadataActionTestDashboard>(),
+      user = "sandy",
+      capabilities = "test_admin_access"
+    )
+    assertEquals(DEFAULT_THEME, response.dashboardMetadata.theme)
   }
 
   private fun executeRequest(

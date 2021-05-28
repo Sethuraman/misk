@@ -4,14 +4,14 @@ import com.google.common.base.Stopwatch
 import com.google.common.base.Ticker
 import misk.Action
 import misk.MiskCaller
-import misk.logging.getLogger
-import misk.logging.info
 import misk.random.ThreadLocalRandom
 import misk.scope.ActionScoped
 import misk.web.HttpCall
 import misk.web.NetworkChain
 import misk.web.NetworkInterceptor
 import misk.web.interceptors.LogRateLimiter.LogBucketId
+import wisp.logging.getLogger
+import wisp.logging.info
 import java.util.concurrent.TimeUnit
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -108,7 +108,7 @@ class RequestLoggingInterceptor internal constructor(
     if (error != null) {
       builder.append(" failed")
     } else {
-      builder.append(" code=${statusCode}")
+      builder.append(" code=$statusCode")
     }
 
     val isError = statusCode > 299 || error != null
@@ -133,11 +133,9 @@ class RequestLoggingInterceptor internal constructor(
       }
     }
 
-
     logger.info(
       "response_code" to statusCode,
       "response_time_millis" to stopwatch.elapsed(TimeUnit.MILLISECONDS)
-    )
-    { builder.toString() }
+    ) { builder.toString() }
   }
 }

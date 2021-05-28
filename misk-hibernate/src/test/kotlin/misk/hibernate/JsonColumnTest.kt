@@ -1,7 +1,6 @@
 package misk.hibernate
 
 import misk.MiskTestingServiceModule
-import misk.config.Config
 import misk.config.MiskConfig
 import misk.environment.Environment
 import misk.environment.EnvironmentModule
@@ -11,6 +10,7 @@ import misk.testing.MiskTest
 import misk.testing.MiskTestModule
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
+import wisp.config.Config
 import javax.inject.Inject
 import javax.inject.Qualifier
 import javax.persistence.Column
@@ -30,14 +30,18 @@ class JsonColumnTest {
   @Test
   fun happyPath() {
     transacter.transaction { session ->
-      session.save(DbWillFerrellMovie("Anchorman", listOf("Vince Vaughn", "Christina Applegate"),
-          Setting("San Diego", "1970")))
+      session.save(
+        DbWillFerrellMovie(
+          "Anchorman", listOf("Vince Vaughn", "Christina Applegate"),
+          Setting("San Diego", "1970")
+        )
+      )
     }
     transacter.transaction { session ->
       val movie = queryFactory.newQuery(WillFerrellMovieQuery::class)
-          .allowTableScan()
-          .name("Anchorman")
-          .nameAndCameosAndSetting(session)[0]
+        .allowTableScan()
+        .name("Anchorman")
+        .nameAndCameosAndSetting(session)[0]
       assertThat(movie.name).isEqualTo("Anchorman")
       assertThat(movie.cameos).isEqualTo(listOf("Vince Vaughn", "Christina Applegate"))
       assertThat(movie.setting).isEqualTo(Setting("San Diego", "1970"))
@@ -67,9 +71,9 @@ class JsonColumnTest {
     }
     transacter.transaction { session ->
       val movie = queryFactory.newQuery(WillFerrellMovieQuery::class)
-          .allowTableScan()
-          .name("Anchorman")
-          .nameAndCameosAndSetting(session)[0]
+        .allowTableScan()
+        .name("Anchorman")
+        .nameAndCameosAndSetting(session)[0]
       assertThat(movie.name).isEqualTo("Anchorman")
       assertThat(movie.cameos).isEqualTo(listOf("Vince Vaughn", "Christina Applegate"))
       assertNull(movie.setting)

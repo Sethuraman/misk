@@ -3,8 +3,8 @@ package misk.hibernate
 import com.google.common.util.concurrent.Service
 import misk.healthchecks.HealthCheck
 import misk.healthchecks.HealthStatus
-import misk.logging.getLogger
 import org.hibernate.SessionFactory
+import wisp.logging.getLogger
 import java.sql.Timestamp
 import java.time.Clock
 import java.time.Duration
@@ -40,7 +40,7 @@ internal class HibernateHealthCheck(
 
     val delta = Duration.between(clock.instant(), databaseInstant).abs()
     val driftMessage = "Hibernate: host and ${qualifier.simpleName} database " +
-        "clocks have drifted ${delta.seconds}s apart"
+      "clocks have drifted ${delta.seconds}s apart"
 
     return when {
       delta > CLOCK_SKEW_UNHEALTHY_THRESHOLD -> {

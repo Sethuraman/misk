@@ -1,6 +1,7 @@
 package misk.web.resource
 
 import com.google.inject.name.Names
+import misk.MiskTestingServiceModule
 import misk.client.HttpClientEndpointConfig
 import misk.client.HttpClientModule
 import misk.client.HttpClientsConfig
@@ -10,6 +11,7 @@ import misk.resources.ResourceLoader
 import misk.testing.MiskTest
 import misk.testing.MiskTestModule
 import misk.web.WebActionModule
+import misk.web.WebServerTestingModule
 import misk.web.WebTestingModule
 import misk.web.jetty.JettyService
 import misk.web.mediatype.MediaTypes.APPLICATION_JAVASCRIPT
@@ -38,43 +40,64 @@ class StaticResourceActionTest {
 
   @BeforeEach
   internal fun setUp() {
-    resourceLoader.put("memory:/web/hi/app.js", """
+    resourceLoader.put(
+      "memory:/web/hi/app.js",
+      """
         |alert("hello world");
-        |""".trimMargin())
-    resourceLoader.put("memory:/web/hi/index.html", """
+        |""".trimMargin()
+    )
+    resourceLoader.put(
+      "memory:/web/hi/index.html",
+      """
         |<html>
         |  <body>
         |    <p>Hello world</p>
         |  </body>
         |</html>
-        |""".trimMargin())
-    resourceLoader.put("memory:/web/hi/main.css", """
+        |""".trimMargin()
+    )
+    resourceLoader.put(
+      "memory:/web/hi/main.css",
+      """
         |hello > world {
         |  color: blue;
         |}
-        |""".trimMargin())
-    resourceLoader.put("memory:/web/nasa/command/index.html", """
+        |""".trimMargin()
+    )
+    resourceLoader.put(
+      "memory:/web/nasa/command/index.html",
+      """
         |<html>
         |  <body>
         |    <p>Welcome to NASA Space Command Dashboard</p>
         |  </body>
         |</html>
-        |""".trimMargin())
-    resourceLoader.put("memory:/web/nasa/tabs/o2fuel/tab_o2fuel.js", """
+        |""".trimMargin()
+    )
+    resourceLoader.put(
+      "memory:/web/nasa/tabs/o2fuel/tab_o2fuel.js",
+      """
         |alert("nasa world");
-        |""".trimMargin())
-    resourceLoader.put("memory:/web/nasa/tabs/o2fuel/index.html", """
+        |""".trimMargin()
+    )
+    resourceLoader.put(
+      "memory:/web/nasa/tabs/o2fuel/index.html",
+      """
         |<html>
         |  <body>
         |    <p>Your o2fuel gauge reads: this</p>
         |  </body>
         |</html>
-        |""".trimMargin())
-    resourceLoader.put("memory:/web/nasa/tabs/o2fuel/tab_o2fuel.css", """
+        |""".trimMargin()
+    )
+    resourceLoader.put(
+      "memory:/web/nasa/tabs/o2fuel/tab_o2fuel.css",
+      """
         |nasa > world {
         |  color: blue;
         |}
-        |""".trimMargin())
+        |""".trimMargin()
+    )
   }
 
   @Test fun hiRoot() {
@@ -123,7 +146,8 @@ class StaticResourceActionTest {
     val response = request("/nasa/command/")
     assertThat(response.code).isEqualTo(200)
     assertThat(response.body!!.string()).contains(
-        "<p>Welcome to NASA Space Command Dashboard</p>")
+      "<p>Welcome to NASA Space Command Dashboard</p>"
+    )
     assertThat(response.header("Content-Type")).isEqualTo(TEXT_HTML)
   }
 
@@ -131,7 +155,8 @@ class StaticResourceActionTest {
     val response = request("/nasa/command/index.html")
     assertThat(response.code).isEqualTo(200)
     assertThat(response.body!!.string()).contains(
-        "<p>Welcome to NASA Space Command Dashboard</p>")
+      "<p>Welcome to NASA Space Command Dashboard</p>"
+    )
     assertThat(response.header("Content-Type")).isEqualTo(TEXT_HTML)
   }
 
@@ -139,7 +164,8 @@ class StaticResourceActionTest {
     val response = request("/nasa/tabs/o2fuel/")
     assertThat(response.code).isEqualTo(200)
     assertThat(response.body!!.string()).contains(
-        "<p>Your o2fuel gauge reads: this</p>")
+      "<p>Your o2fuel gauge reads: this</p>"
+    )
     assertThat(response.header("Content-Type")).isEqualTo(TEXT_HTML)
   }
 
@@ -147,7 +173,8 @@ class StaticResourceActionTest {
     val response = request("/nasa/tabs/o2fuel/index.html")
     assertThat(response.code).isEqualTo(200)
     assertThat(response.body!!.string()).contains(
-        "<p>Your o2fuel gauge reads: this</p>")
+      "<p>Your o2fuel gauge reads: this</p>"
+    )
     assertThat(response.header("Content-Type")).isEqualTo(TEXT_HTML)
   }
 
@@ -169,7 +196,8 @@ class StaticResourceActionTest {
     val response = request("/nasa/command/another/link/here/for/anti/brevity?with=query")
     assertThat(response.code).isEqualTo(200)
     assertThat(response.body!!.string()).contains(
-        "<p>Welcome to NASA Space Command Dashboard</p>")
+      "<p>Welcome to NASA Space Command Dashboard</p>"
+    )
     assertThat(response.header("Content-Type")).isEqualTo(TEXT_HTML)
   }
 
@@ -177,7 +205,8 @@ class StaticResourceActionTest {
     val response = request("/nasa/tabs/o2fuel/another/link/here/for/anti/brevity?with=query")
     assertThat(response.code).isEqualTo(200)
     assertThat(response.body!!.string()).contains(
-        "<p>Your o2fuel gauge reads: this</p>")
+      "<p>Your o2fuel gauge reads: this</p>"
+    )
     assertThat(response.header("Content-Type")).isEqualTo(TEXT_HTML)
   }
 
@@ -185,7 +214,8 @@ class StaticResourceActionTest {
     val response = request("/nasa/tabs/o2fuel/////anti/brevity?with=query")
     assertThat(response.code).isEqualTo(200)
     assertThat(response.body!!.string()).contains(
-        "<p>Your o2fuel gauge reads: this</p>")
+      "<p>Your o2fuel gauge reads: this</p>"
+    )
     assertThat(response.header("Content-Type")).isEqualTo(TEXT_HTML)
   }
 
@@ -193,7 +223,8 @@ class StaticResourceActionTest {
     val response = request("/nasa/tabs/o2fuel/////anti/brevity?with=query")
     assertThat(response.code).isEqualTo(200)
     assertThat(response.body!!.string()).contains(
-        "<p>Your o2fuel gauge reads: this</p>")
+      "<p>Your o2fuel gauge reads: this</p>"
+    )
     assertThat(response.header("Content-Type")).isEqualTo(TEXT_HTML)
   }
 
@@ -201,7 +232,8 @@ class StaticResourceActionTest {
     val response = request("/nasa/tabs/o2fuel/.test/.config/.ssh/anti/brevity?with=query")
     assertThat(response.code).isEqualTo(200)
     assertThat(response.body!!.string()).contains(
-        "<p>Your o2fuel gauge reads: this</p>")
+      "<p>Your o2fuel gauge reads: this</p>"
+    )
     assertThat(response.header("Content-Type")).isEqualTo(TEXT_HTML)
   }
 
@@ -213,32 +245,44 @@ class StaticResourceActionTest {
 
   class TestModule : KAbstractModule() {
     override fun configure() {
-      install(HttpClientsConfigModule(HttpClientsConfig(
-          endpoints = mapOf(
+      install(
+        HttpClientsConfigModule(
+          HttpClientsConfig(
+            endpoints = mapOf(
               "static_resource_action" to HttpClientEndpointConfig("http://example.com/")
-          ))))
-      install(HttpClientModule("static_resource_action",
-          Names.named("static_resource_action")))
+            )
+          )
+        )
+      )
+      install(
+        HttpClientModule(
+          "static_resource_action",
+          Names.named("static_resource_action")
+        )
+      )
 
       install(WebActionModule.createWithPrefix<StaticResourceAction>("/hi/"))
       multibind<StaticResourceEntry>()
-          .toInstance(StaticResourceEntry("/hi/", "memory:/web/hi"))
+        .toInstance(StaticResourceEntry("/hi/", "memory:/web/hi"))
 
       install(WebActionModule.createWithPrefix<StaticResourceAction>("/nasa/command/"))
       multibind<StaticResourceEntry>()
-          .toInstance(StaticResourceEntry("/nasa/command/", "memory:/web/nasa/command/"))
+        .toInstance(StaticResourceEntry("/nasa/command/", "memory:/web/nasa/command/"))
       install(WebActionModule.createWithPrefix<StaticResourceAction>("/nasa/tabs/o2fuel/"))
       multibind<StaticResourceEntry>()
-          .toInstance(StaticResourceEntry("/nasa/tabs/o2fuel/", "memory:/web/nasa/tabs/o2fuel/"))
+        .toInstance(StaticResourceEntry("/nasa/tabs/o2fuel/", "memory:/web/nasa/tabs/o2fuel/"))
 
-      install(WebTestingModule())
+      install(WebServerTestingModule())
+      install(MiskTestingServiceModule())
     }
   }
 
   private fun request(path: String): okhttp3.Response {
-    return httpClient.newCall(okhttp3.Request.Builder()
+    return httpClient.newCall(
+      okhttp3.Request.Builder()
         .url(jettyService.httpServerUrl.newBuilder().encodedPath(path).build())
-        .build())
-        .execute()
+        .build()
+    )
+      .execute()
   }
 }

@@ -1,15 +1,33 @@
 package misk.environment
 
-import com.google.inject.util.Modules
 import com.google.inject.Module
+import com.google.inject.util.Modules
 import misk.inject.KAbstractModule
 
-/** Binds [Deployment] and [Env] to make them available to services and actions */
+/** Binds [Deployment], [wisp.deployment.Deployment] and [Env] to make them available to
+ * services and actions
+ */
 class DeploymentModule(
   private val deployment: Deployment,
   private val env: Env
 ) : KAbstractModule() {
+
+  constructor(
+    deployment: wisp.deployment.Deployment,
+    env: Env
+
+  ) : this(
+    Deployment(
+      deployment.name,
+      deployment.isProduction,
+      deployment.isTest,
+      deployment.isLocalDevelopment
+    ),
+    env
+  )
+
   override fun configure() {
+    bind<wisp.deployment.Deployment>().toInstance(deployment.wispDeployment)
     bind<Deployment>().toInstance(deployment)
     bind<Env>().toInstance(env)
   }
@@ -22,10 +40,11 @@ class DeploymentModule(
      */
     fun forTesting(): Module {
       return Modules.combine(
-          DeploymentModule(
-              deployment = TEST_DEPLOYMENT,
-              env = Env("TESTING")),
-          EnvironmentModule(Environment.TESTING)
+        DeploymentModule(
+          deployment = TEST_DEPLOYMENT,
+          env = Env("TESTING")
+        ),
+        EnvironmentModule(Environment.TESTING)
       )
     }
 

@@ -1,7 +1,6 @@
 package misk.web.metadata
 
 import misk.config.AppName
-import misk.config.Config
 import misk.inject.KAbstractModule
 import misk.web.actions.TestWebActionModule
 import misk.web.dashboard.AdminDashboardTestingModule
@@ -10,6 +9,9 @@ import misk.web.dashboard.DashboardNavbarItem
 import misk.web.dashboard.DashboardNavbarStatus
 import misk.web.dashboard.DashboardTab
 import misk.web.dashboard.DashboardTabProvider
+import misk.web.dashboard.DashboardTheme
+import misk.web.dashboard.MiskWebTheme
+import wisp.config.Config
 import javax.inject.Qualifier
 
 // Common test module used to be able to test admin dashboard WebActions
@@ -29,7 +31,8 @@ class MetadataTestingModule : KAbstractModule() {
         name = "Test Dashboard Tab",
         category = "test category",
         capabilities = setOf("test_admin_access")
-      ))
+      )
+    )
 
     multibind<DashboardNavbarItem>().toInstance(
       DashboardNavbarItem<DashboardMetadataActionTestDashboard>(
@@ -40,12 +43,20 @@ class MetadataTestingModule : KAbstractModule() {
 
     multibind<DashboardNavbarStatus>().toInstance(
       DashboardNavbarStatus<DashboardMetadataActionTestDashboard>(
-        status = "Test Status")
+        status = "Test Status"
+      )
     )
 
     multibind<DashboardHomeUrl>().toInstance(
       DashboardHomeUrl<DashboardMetadataActionTestDashboard>(
-        urlPathPrefix = "/test-app/")
+        urlPathPrefix = "/test-app/"
+      )
+    )
+
+    multibind<DashboardTheme>().toInstance(
+      DashboardTheme<DashboardMetadataActionTestDashboard>(
+        theme = MiskWebTheme.DEFAULT_THEME
+      )
     )
   }
 }

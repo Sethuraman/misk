@@ -8,6 +8,7 @@ import java.util.concurrent.ThreadLocalRandom
  * functions, so that they can change dynamically as the system is running (e.g.
  * in response to changes in dynamic flags)
  */
+@Deprecated("Use kotlinRetry instead")
 class ExponentialBackoff(
   private val baseDelay: () -> Duration,
   private val maxDelay: () -> Duration,
@@ -25,7 +26,7 @@ class ExponentialBackoff(
    * @param maxDelay The [Supplier] for maximum amount of time to wait between retries
    */
   constructor(baseDelay: () -> Duration, maxDelay: () -> Duration) :
-      this(baseDelay, maxDelay, { Duration.ofMillis(0) })
+    this(baseDelay, maxDelay, { Duration.ofMillis(0) })
 
   /**
    * Creates a new [ExponentialBackoff] from fixed delays and jitter amounts
@@ -35,7 +36,7 @@ class ExponentialBackoff(
    * @param jitter The amount of jitter to introduce
    */
   constructor(baseDelay: Duration, maxDelay: Duration, jitter: Duration) :
-      this({ baseDelay }, { maxDelay }, { jitter })
+    this({ baseDelay }, { maxDelay }, { jitter })
 
   /**
    * Creates a new [ExponentialBackoff] from fixed delays, without jitter
@@ -44,7 +45,7 @@ class ExponentialBackoff(
    * @param maxDelay The max amount of time to delay
    */
   constructor(baseDelay: Duration, maxDelay: Duration) :
-      this(baseDelay, maxDelay, Duration.ofMillis(0))
+    this(baseDelay, maxDelay, Duration.ofMillis(0))
 
   override fun reset() {
     consecutiveRetryCount = 0

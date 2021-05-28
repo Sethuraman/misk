@@ -1,6 +1,7 @@
 package misk.web.exceptions
 
 import com.squareup.moshi.Moshi
+import misk.MiskTestingServiceModule
 import misk.exceptions.ActionException
 import misk.exceptions.StatusCode
 import misk.inject.KAbstractModule
@@ -10,6 +11,7 @@ import misk.web.Get
 import misk.web.PathParam
 import misk.web.ResponseContentType
 import misk.web.WebActionModule
+import misk.web.WebServerTestingModule
 import misk.web.WebTestingModule
 import misk.web.actions.WebAction
 import misk.web.jetty.JettyService
@@ -61,9 +63,9 @@ internal class ExceptionMapperTest {
   fun get(path: String): okhttp3.Response {
     val httpClient = OkHttpClient()
     val request = Request.Builder()
-        .get()
-        .url(serverUrlBuilder().encodedPath(path).build())
-        .build()
+      .get()
+      .url(serverUrlBuilder().encodedPath(path).build())
+      .build()
     return httpClient.newCall(request).execute()
   }
 
@@ -85,7 +87,8 @@ internal class ExceptionMapperTest {
 
   class TestModule : KAbstractModule() {
     override fun configure() {
-      install(WebTestingModule())
+      install(WebServerTestingModule())
+      install(MiskTestingServiceModule())
       install(WebActionModule.create<ThrowsActionException>())
       install(WebActionModule.create<ThrowsUnmappedError>())
     }

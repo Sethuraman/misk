@@ -7,6 +7,7 @@ import misk.scope.ActionScope
 import misk.security.authz.AccessInterceptor
 import misk.web.actions.WebAction
 import misk.web.actions.asChain
+import misk.web.actions.findAnnotationWithOverrides
 import misk.web.mediatype.MediaRange
 import misk.web.mediatype.MediaTypes
 import misk.web.mediatype.compareTo
@@ -16,6 +17,7 @@ import okhttp3.MediaType
 import java.util.regex.Matcher
 import javax.inject.Provider
 import javax.servlet.http.HttpServletRequest
+import kotlin.reflect.KType
 
 /**
  * Decodes an HTTP request into a call to a web action, then encodes its response into an HTTP
@@ -44,35 +46,35 @@ internal class BoundAction<A : WebAction>(
     // Confirm the request content type matches the types we accept, and pick the most specific
     // content type match
     val requestContentTypeMatch =
-        requestContentType?.closestMediaRangeMatch(action.acceptedMediaRanges)
+      requestContentType?.closestMediaRangeMatch(action.acceptedMediaRanges)
     if (requestContentType != null && requestContentTypeMatch == null) return null
 
     // Confirm we can generate a response content type matching the set accepted by the request,
     // and pick the most specific response content type match
     val responseContentTypeMatch =
-        action.responseContentType?.closestMediaRangeMatch(requestAcceptedTypes)
+      action.responseContentType?.closestMediaRangeMatch(requestAcceptedTypes)
     if (action.responseContentType != null && responseContentTypeMatch == null) return null
 
     val acceptedMediaRange = requestContentTypeMatch?.mediaRange ?: MediaRange.ALL_MEDIA
     val requestCharsetMatch = requestContentTypeMatch?.matchesCharset ?: false
 
     return BoundActionMatch(
-        action = this,
-        pathMatcher = pathMatcher,
-        acceptedMediaRange = acceptedMediaRange,
-        requestCharsetMatch = requestCharsetMatch,
-        responseContentType = action.responseContentType ?: MediaTypes.ALL_MEDIA_TYPE
+      action = this,
+      pathMatcher = pathMatcher,
+      acceptedMediaRange = acceptedMediaRange,
+      requestCharsetMatch = requestCharsetMatch,
+      responseContentType = action.responseContentType ?: MediaTypes.ALL_MEDIA_TYPE
     )
   }
 
   fun matchByUrl(url: HttpUrl): BoundActionMatch? {
     val patchMather = pathPattern.matcher(url) ?: return null
     return BoundActionMatch(
-        action = this,
-        pathMatcher = patchMather,
-        acceptedMediaRange = MediaRange.ALL_MEDIA,
-        requestCharsetMatch = false,
-        responseContentType = MediaTypes.ALL_MEDIA_TYPE
+      action = this,
+      pathMatcher = patchMather,
+      acceptedMediaRange = MediaRange.ALL_MEDIA,
+      requestCharsetMatch = false,
+      responseContentType = MediaTypes.ALL_MEDIA_TYPE
     )
   }
 
@@ -102,8 +104,8 @@ internal class BoundAction<A : WebAction>(
     pathMatcher: Matcher
   ) {
     val seedData = mapOf(
-        keyOf<HttpServletRequest>() to request,
-        keyOf<HttpCall>() to httpCall
+      keyOf<HttpServletRequest>() to request,
+      keyOf<HttpCall>() to httpCall
     )
     scope.enter(seedData).use {
       handle(httpCall, pathMatcher)
@@ -116,8 +118,11 @@ internal class BoundAction<A : WebAction>(
 
     // RequestBridgeInterceptor necessarily needs to be the last NetworkInterceptor run.
     val interceptors = networkInterceptors.toMutableList()
-    interceptors.add(RequestBridgeInterceptor(
-        webActionBinding, applicationInterceptors, pathMatcher))
+    interceptors.add(
+      RequestBridgeInterceptor(
+        webActionBinding, applicationInterceptors, pathMatcher
+      )
+    )
 
     val chain = RealNetworkChain(action, webAction, httpCall, interceptors.toList())
     chain.proceed(httpCall)
@@ -127,21 +132,34 @@ internal class BoundAction<A : WebAction>(
     WebActionMetadata(
       name = action.name,
       function = action.function,
+      description = action.function.findAnnotationWithOverrides<Description>()?.text,
       functionAnnotations = action.function.annotations,
       acceptedMediaRanges = action.acceptedMediaRanges,
       responseContentType = action.responseContentType,
       parameterTypes = action.parameterTypes,
+      parameters = action.parameters,
       requestType = action.requestType,
       returnType = action.returnType,
+      responseType = determineResponseType(action.returnType),
       pathPattern = pathPattern,
       applicationInterceptors = applicationInterceptors,
       networkInterceptors = networkInterceptors,
       dispatchMechanism = action.dispatchMechanism,
       allowedServices = fetchAllowedCallers(
-        applicationInterceptors, AccessInterceptor::allowedServices),
-      allowedCapabilities = fetchAllowedCallers(applicationInterceptors,
-        AccessInterceptor::allowedCapabilities)
+        applicationInterceptors, AccessInterceptor::allowedServices
+      ),
+      allowedCapabilities = fetchAllowedCallers(
+        applicationInterceptors,
+        AccessInterceptor::allowedCapabilities
+      )
     )
+  }
+
+  private fun determineResponseType(returnType: KType): KType? {
+    if (returnType.arguments.isNotEmpty()) {
+      return returnType.arguments[0].type
+    }
+    return null
   }
 
   private fun fetchAllowedCallers(
@@ -188,7 +206,7 @@ internal open class RequestMatch(
   }
 
   override fun toString(): String =
-      "path: $pathPattern, accepts: $acceptedMediaRange, emits: $responseContentType"
+    "path: $pathPattern, accepts: $acceptedMediaRange, emits: $responseContentType"
 }
 
 /** A [RequestMatch] associated with the action that matched. */
@@ -201,7 +219,7 @@ internal class BoundActionMatch(
 ) : RequestMatch(action.pathPattern, acceptedMediaRange, requestCharsetMatch, responseContentType)
 
 private fun MediaType.closestMediaRangeMatch(ranges: List<MediaRange>) =
-    ranges.mapNotNull { it.matcher(this) }.sorted().firstOrNull()
+  ranges.mapNotNull { it.matcher(this) }.sorted().firstOrNull()
 
 /**
  * Acts as the bridge between network interceptors and application interceptors.
@@ -219,7 +237,8 @@ private class RequestBridgeInterceptor(
     val arguments = webActionBinding.beforeCall(chain.webAction, httpCall, pathMatcher)
 
     val applicationChain = chain.webAction.asChain(
-        chain.action.function, arguments, applicationInterceptors, httpCall)
+      chain.action.function, arguments, applicationInterceptors, httpCall
+    )
 
     var returnValue = applicationChain.proceed(applicationChain.args)
 

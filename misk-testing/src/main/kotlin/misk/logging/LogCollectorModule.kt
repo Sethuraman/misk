@@ -2,6 +2,7 @@ package misk.logging
 
 import misk.ServiceModule
 import misk.inject.KAbstractModule
+import wisp.logging.LogCollector
 
 class LogCollectorModule : KAbstractModule() {
   override fun configure() {

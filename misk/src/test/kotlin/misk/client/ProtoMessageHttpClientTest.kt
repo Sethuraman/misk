@@ -14,6 +14,7 @@ import misk.web.RequestBody
 import misk.web.RequestContentType
 import misk.web.ResponseContentType
 import misk.web.WebActionModule
+import misk.web.WebServerTestingModule
 import misk.web.WebTestingModule
 import misk.web.actions.WebAction
 import misk.web.jetty.JettyService
@@ -43,19 +44,23 @@ class ProtoMessageHttpClientTest {
   @Test
   fun protoMessageHttpCall() {
     val dinoMessage = Dinosaur.Builder()
-        .name("stegosaurus")
-        .picture_urls(listOf(
-            "https://cdn.dinopics.com/stego.jpg",
-            "https://cdn.dinopics.com/stego2.png"
-        ))
-        .build()
+      .name("stegosaurus")
+      .picture_urls(
+        listOf(
+          "https://cdn.dinopics.com/stego.jpg",
+          "https://cdn.dinopics.com/stego2.png"
+        )
+      )
+      .build()
 
     val response = httpClient.post<Dinosaur>("/cooldinos", dinoMessage)
     assertThat(response.name).isEqualTo("supersaurus")
-    assertThat(response.picture_urls).isEqualTo(listOf(
+    assertThat(response.picture_urls).isEqualTo(
+      listOf(
         "https://cdn.dinopics.com/stego.jpg",
         "https://cdn.dinopics.com/stego2.png"
-    ))
+      )
+    )
   }
 
   class ReturnADinosaur @Inject constructor() : WebAction {
@@ -63,12 +68,13 @@ class ProtoMessageHttpClientTest {
     @RequestContentType(MediaTypes.APPLICATION_JSON)
     @ResponseContentType(MediaTypes.APPLICATION_JSON)
     fun getDinosaur(@RequestBody requestBody: Dinosaur):
-        Dinosaur = requestBody.newBuilder().name("supersaurus").build()
+      Dinosaur = requestBody.newBuilder().name("supersaurus").build()
   }
 
   class TestModule : KAbstractModule() {
     override fun configure() {
-      install(WebTestingModule())
+      install(MiskTestingServiceModule())
+      install(WebServerTestingModule())
       install(WebActionModule.create<ReturnADinosaur>())
     }
   }
@@ -85,9 +91,10 @@ class ProtoMessageHttpClientTest {
     @Singleton
     fun provideHttpClientConfig(): HttpClientsConfig {
       return HttpClientsConfig(
-          endpoints = mapOf(
-              "dinosaur" to HttpClientEndpointConfig(jetty.httpServerUrl.toString())
-          ))
+        endpoints = mapOf(
+          "dinosaur" to HttpClientEndpointConfig(jetty.httpServerUrl.toString())
+        )
+      )
     }
   }
 }

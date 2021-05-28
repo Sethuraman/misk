@@ -2,7 +2,6 @@ package misk.jobqueue
 
 import com.squareup.moshi.Moshi
 import misk.MiskTestingServiceModule
-import misk.config.Config
 import misk.config.MiskConfig
 import misk.environment.DeploymentModule
 import misk.environment.Environment
@@ -12,15 +11,16 @@ import misk.hibernate.Session
 import misk.hibernate.Transacter
 import misk.inject.KAbstractModule
 import misk.jdbc.DataSourceConfig
-import misk.logging.LogCollector
 import misk.logging.LogCollectorModule
-import misk.logging.getLogger
 import misk.moshi.adapter
 import misk.testing.MiskTest
 import misk.testing.MiskTestModule
 import misk.tokens.TokenGenerator
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
+import wisp.config.Config
+import wisp.logging.LogCollector
+import wisp.logging.getLogger
 import javax.inject.Inject
 import javax.inject.Qualifier
 import kotlin.IllegalStateException
@@ -53,8 +53,8 @@ internal class FakeTransactionalJobQueueTest {
     fakeTransactionalJobQueue.handleJobs()
 
     assertThat(logCollector.takeMessages(Starport::class)).containsExactlyInAnyOrder(
-        "received build MEDIVAC command",
-        "received build LIBERATOR command"
+      "received build MEDIVAC command",
+      "received build LIBERATOR command"
     )
 
     assertThat(fakeTransactionalJobQueue.peekJobs(FACTORY_QUEUE)).isEmpty()

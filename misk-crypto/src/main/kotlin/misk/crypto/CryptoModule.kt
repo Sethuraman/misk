@@ -56,14 +56,21 @@ class CryptoModule(
      * name can only exist in one of the providers. This makes migrating keys between stores less
      * error-prone.
      */
-    val keyManagerBinder = newMultibinder(ExternalKeyManager::class)
+    val keyManagerBinder = newMultibinder(KeyResolver::class)
+    val serviceKeys = mutableMapOf<KeyAlias, KeyType>()
 
     /* Parse and include all local keys first. */
     config.keys?.let { keys ->
-      keyManagerBinder.addBinding().toInstance(LocalConfigKeyProvider(keys, config.kms_uri))
+      try {
+        keys.map { it.encrypted_key }.requireNoNulls()
+      } catch (e: IllegalArgumentException) {
+        throw IllegalArgumentException("Found local key with no 'encrypted_key' value", e)
+      }
+      keyManagerBinder.addBinding().toInstance(LocalConfigKeyResolver(keys, config.kms_uri))
 
       keys.forEach {
         bindKeyToProvider(it.key_name, it.key_type)
+        serviceKeys[it.key_name] = it.key_type
       }
 
       keyNames = keys.map { it.key_name }
@@ -73,92 +80,97 @@ class CryptoModule(
       }
     }
 
+    bind(object : TypeLiteral<Map<KeyAlias, KeyType>>() {})
+      .annotatedWith(ServiceKeys::class.java)
+      .toInstance(serviceKeys.toMap())
+
+    val externalDataKeys = config.external_data_keys ?: emptyMap()
+    bind(object : TypeLiteral<Map<KeyAlias, KeyType>>() {})
+      .annotatedWith(ExternalDataKeys::class.java)
+      .toInstance(externalDataKeys)
+
     /* Include all configured remotely-provided keys. */
-    config.external_data_keys?.let { external_data_keys ->
+    if (externalDataKeys.isNotEmpty()) {
       requireBinding<AmazonS3>()
 
-      bind(object : TypeLiteral<Map<KeyAlias, KeyType>>() {})
-          .annotatedWith(Names.named("all_key_aliases"))
-          .toInstance(external_data_keys)
+      keyManagerBinder.addBinding().to<S3KeyResolver>()
 
-      keyManagerBinder.addBinding().to<S3ExternalKeyManager>()
-
-      val internalAndExternal = keyNames.intersect(external_data_keys.keys)
+      val internalAndExternal = keyNames.intersect(externalDataKeys.keys)
       check(internalAndExternal.isEmpty()) {
-        "Found keys that are marked as both provided in resources, and provided externally: [$internalAndExternal]"
+        "Found keys that are marked as both provided in resources, and provided externally: " +
+          "[$internalAndExternal]"
       }
 
-      external_data_keys.forEach { (alias, type) ->
+      externalDataKeys.forEach { (alias, type) ->
         // External keys use a KMS key per keyset
         bindKeyToProvider(alias, type)
       }
     }
-
   }
 
   private fun bindKeyToProvider(alias: KeyAlias, type: KeyType) {
     when (type) {
       KeyType.AEAD -> {
         bind<Aead>()
-            .annotatedWith(Names.named(alias))
-            .toProvider(AeadEnvelopeProvider(alias))
-            .`in`(Singleton::class.java)
+          .annotatedWith(Names.named(alias))
+          .toProvider(AeadEnvelopeProvider(alias))
+          .`in`(Singleton::class.java)
       }
       KeyType.DAEAD -> {
         bind<DeterministicAead>()
-            .annotatedWith(Names.named(alias))
-            .toProvider(DeterministicAeadProvider(alias))
-            .`in`(Singleton::class.java)
+          .annotatedWith(Names.named(alias))
+          .toProvider(DeterministicAeadProvider(alias))
+          .`in`(Singleton::class.java)
       }
       KeyType.MAC -> {
         bind<Mac>()
-            .annotatedWith(Names.named(alias))
-            .toProvider(MacProvider(alias))
-            .`in`(Singleton::class.java)
+          .annotatedWith(Names.named(alias))
+          .toProvider(MacProvider(alias))
+          .`in`(Singleton::class.java)
       }
       KeyType.DIGITAL_SIGNATURE -> {
         bind<PublicKeySign>()
-            .annotatedWith(Names.named(alias))
-            .toProvider(DigitalSignatureSignerProvider(alias))
-            .`in`(Singleton::class.java)
+          .annotatedWith(Names.named(alias))
+          .toProvider(DigitalSignatureSignerProvider(alias))
+          .`in`(Singleton::class.java)
         bind<PublicKeyVerify>()
-            .annotatedWith(Names.named(alias))
-            .toProvider(DigitalSignatureVerifierProvider(alias))
-            .`in`(Singleton::class.java)
+          .annotatedWith(Names.named(alias))
+          .toProvider(DigitalSignatureVerifierProvider(alias))
+          .`in`(Singleton::class.java)
       }
       KeyType.HYBRID_ENCRYPT -> {
         bind<HybridEncrypt>()
-            .annotatedWith(Names.named(alias))
-            .toProvider(HybridEncryptProvider(alias))
-            .`in`(Singleton::class.java)
+          .annotatedWith(Names.named(alias))
+          .toProvider(HybridEncryptProvider(alias))
+          .`in`(Singleton::class.java)
       }
       KeyType.HYBRID_ENCRYPT_DECRYPT -> {
         bind<HybridDecrypt>()
-            .annotatedWith(Names.named(alias))
-            .toProvider(HybridDecryptProvider(alias))
-            .`in`(Singleton::class.java)
+          .annotatedWith(Names.named(alias))
+          .toProvider(HybridDecryptProvider(alias))
+          .`in`(Singleton::class.java)
         bind<HybridEncrypt>()
-            .annotatedWith(Names.named(alias))
-            .toProvider(HybridEncryptProvider(alias))
-            .`in`(Singleton::class.java)
+          .annotatedWith(Names.named(alias))
+          .toProvider(HybridEncryptProvider(alias))
+          .`in`(Singleton::class.java)
       }
       KeyType.STREAMING_AEAD -> {
         bind<StreamingAead>()
-            .annotatedWith(Names.named(alias))
-            .toProvider(StreamingAeadProvider(alias))
-            .`in`(Singleton::class.java)
+          .annotatedWith(Names.named(alias))
+          .toProvider(StreamingAeadProvider(alias))
+          .`in`(Singleton::class.java)
       }
       KeyType.PGP_DECRYPT -> {
         bind<PgpDecrypter>()
-            .annotatedWith(Names.named(alias))
-            .toProvider(PgpDecrypterProvider(alias))
-            .`in`(Singleton::class.java)
+          .annotatedWith(Names.named(alias))
+          .toProvider(PgpDecrypterProvider(alias))
+          .`in`(Singleton::class.java)
       }
       KeyType.PGP_ENCRYPT -> {
         bind<PgpEncrypter>()
-            .annotatedWith(Names.named(alias))
-            .toProvider(PgpEncrypterProvider(alias))
-            .`in`(Singleton::class.java)
+          .annotatedWith(Names.named(alias))
+          .toProvider(PgpEncrypterProvider(alias))
+          .`in`(Singleton::class.java)
       }
     }
   }
@@ -169,11 +181,11 @@ class CryptoModule(
  * This function also makes sure that no extra copies of the plaintext data are kept in memory.
  */
 @Deprecated(
-    message = "This method is marked for deletion, for now use the raw interface provided by Tink",
-    replaceWith = ReplaceWith(
-        expression = "aead.encrypt(ByteArray, ByteArray)"
-    ),
-    level = DeprecationLevel.HIDDEN
+  message = "This method is marked for deletion, for now use the raw interface provided by Tink",
+  replaceWith = ReplaceWith(
+    expression = "aead.encrypt(ByteArray, ByteArray)"
+  ),
+  level = DeprecationLevel.HIDDEN
 )
 fun Aead.encrypt(plaintext: ByteString, aad: ByteArray? = null): ByteString {
   val plaintextBytes = plaintext.toByteArray()
@@ -187,11 +199,11 @@ fun Aead.encrypt(plaintext: ByteString, aad: ByteArray? = null): ByteString {
  * This function also makes sure that no extra copies of the plaintext data are kept in memory.
  */
 @Deprecated(
-    message = "This method is marked for deletion, for now use the raw interface provided by Tink",
-    replaceWith = ReplaceWith(
-        expression = "aead.decrypt(ByteArray, ByteArray)"
-    ),
-    level = DeprecationLevel.HIDDEN
+  message = "This method is marked for deletion, for now use the raw interface provided by Tink",
+  replaceWith = ReplaceWith(
+    expression = "aead.decrypt(ByteArray, ByteArray)"
+  ),
+  level = DeprecationLevel.HIDDEN
 )
 fun Aead.decrypt(ciphertext: ByteString, aad: ByteArray? = null): ByteString {
   val decryptedBytes = this.decrypt(ciphertext.toByteArray(), aad)
@@ -205,11 +217,11 @@ fun Aead.decrypt(ciphertext: ByteString, aad: ByteArray? = null): ByteString {
  * This function also makes sure that no extra copies of the plaintext data are kept in memory.
  */
 @Deprecated(
-    message = "This method is marked for deletion, for now use the raw interface provided by Tink",
-    replaceWith = ReplaceWith(
-        expression = "daead.encryptDeterministically(ByteArray, ByteArray)"
-    ),
-    level = DeprecationLevel.HIDDEN
+  message = "This method is marked for deletion, for now use the raw interface provided by Tink",
+  replaceWith = ReplaceWith(
+    expression = "daead.encryptDeterministically(ByteArray, ByteArray)"
+  ),
+  level = DeprecationLevel.HIDDEN
 )
 fun DeterministicAead.encryptDeterministically(
   plaintext: ByteString,
@@ -226,11 +238,11 @@ fun DeterministicAead.encryptDeterministically(
  * This function also makes sure that no extra copies of the plaintext data are kept in memory.
  */
 @Deprecated(
-    message = "This method is marked for deletion, for now use the raw interface provided by Tink",
-    replaceWith = ReplaceWith(
-        expression = "daead.decryptDeterministically(ByteArray, ByteArray)"
-    ),
-    level = DeprecationLevel.HIDDEN
+  message = "This method is marked for deletion, for now use the raw interface provided by Tink",
+  replaceWith = ReplaceWith(
+    expression = "daead.decryptDeterministically(ByteArray, ByteArray)"
+  ),
+  level = DeprecationLevel.HIDDEN
 )
 fun DeterministicAead.decryptDeterministically(
   ciphertext: ByteString,

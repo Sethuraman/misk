@@ -16,7 +16,6 @@ import misk.hibernate.actions.HibernateDatabaseQueryWebActionModule.Companion.fi
 import misk.hibernate.actions.HibernateDatabaseQueryWebActionModule.Companion.getTransacterForDatabaseQueryAction
 import misk.hibernate.actions.HibernateDatabaseQueryWebActionModule.Companion.validateSelectPathsOrDefault
 import misk.inject.typeLiteral
-import misk.logging.getLogger
 import misk.scope.ActionScoped
 import misk.web.Post
 import misk.web.RequestBody
@@ -26,6 +25,7 @@ import misk.web.actions.WebAction
 import misk.web.dashboard.AdminDashboardAccess
 import misk.web.mediatype.MediaTypes
 import misk.web.metadata.database.DatabaseQueryMetadata
+import wisp.logging.getLogger
 import java.lang.reflect.ParameterizedType
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -85,17 +85,25 @@ internal class HibernateDatabaseQueryStaticAction @Inject constructor(
   ): Pair<List<String>, List<List<Any?>>> {
     val query = queries.map { it.query }.find { it.simpleName == metadata.queryClass }
       ?: throw BadRequestException("[query=${metadata.queryClass}] does not exist")
-    val dbEntity = ((query.typeLiteral().getSupertype(
-      Query::class.java
-    ).type as ParameterizedType).actualTypeArguments.first() as Class<DbEntity<*>>).kotlin
-    val maxRows = ((request.query[QUERY_CONFIG_TYPE_NAME] as Map<String, Any>?)?.get("maxRows") as Double?)?.toInt()
-      ?: queryLimitsConfig.maxMaxRows
+    val dbEntity = (
+      (
+        query.typeLiteral().getSupertype(
+          Query::class.java
+        ).type as ParameterizedType
+        ).actualTypeArguments.first() as Class<DbEntity<*>>
+      ).kotlin
+    val maxRows =
+      ((request.query[QUERY_CONFIG_TYPE_NAME] as Map<String, Any>?)?.get("maxRows") as Double?)
+        ?.toInt() ?: queryLimitsConfig.maxMaxRows
     val configuredQuery = ReflectionQuery.Factory(queryLimitsConfig)
       .newQuery(query)
       .configureStatic(request, metadata, maxRows)
 
     val selectPaths = getStaticSelectPaths(request, metadata, dbEntity)
-    logger.info("Query sent from dashboard [principal=$principal][dbEntity=${request.entityClass}][selectPaths=$selectPaths] ${request.query}")
+    logger.info(
+      "Query sent from dashboard [principal=$principal]" +
+        "[dbEntity=${request.entityClass}][selectPaths=$selectPaths] ${request.query}"
+    )
     val rows = configuredQuery.dynamicList(session, selectPaths)
     return Pair(selectPaths, rows)
   }

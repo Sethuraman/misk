@@ -21,7 +21,7 @@ import javax.inject.Singleton
  */
 @Singleton
 class FakeFeatureFlags @Inject constructor(
-  val moshi : Provider<Moshi>
+  val moshi: Provider<Moshi>
 ) : AbstractIdleService(), FeatureFlags, FeatureService, DynamicConfig {
   companion object {
     const val KEY = "fake_dynamic_flag"
@@ -33,27 +33,30 @@ class FakeFeatureFlags @Inject constructor(
 
   private val overrides = ConcurrentHashMap<MapKey, PriorityQueue<MapValue>>()
 
-  override fun getBoolean(feature: Feature, key: String, attributes: Attributes): Boolean {
-    return getOrDefault(feature, key, false, attributes)
-  }
+  override fun getBoolean(feature: Feature, key: String, attributes: Attributes): Boolean =
+    get(feature, key, attributes) as? Boolean ?: throw IllegalArgumentException(
+      "Boolean flag $feature must be overridden with override() before use; the default value of false has been DEPRECATED"
+    )
 
   override fun getInt(feature: Feature, key: String, attributes: Attributes): Int =
-      get(feature, key, attributes) as? Int ?: throw IllegalArgumentException(
-          "Int flag $feature must be overridden with override() before use")
+    get(feature, key, attributes) as? Int ?: throw IllegalArgumentException(
+      "Int flag $feature must be overridden with override() before use"
+    )
 
   override fun getString(feature: Feature, key: String, attributes: Attributes): String =
-      get(feature, key, attributes) as? String ?: throw IllegalArgumentException(
-          "String flag $feature must be overridden with override() before use")
+    get(feature, key, attributes) as? String ?: throw IllegalArgumentException(
+      "String flag $feature must be overridden with override() before use"
+    )
 
   override fun <T : Enum<T>> getEnum(
     feature: Feature,
     key: String,
     clazz: Class<T>,
     attributes: Attributes
-  ): T {
-    @Suppress("unchecked_cast")
-    return getOrDefault(feature, key, clazz.enumConstants[0], attributes) as T
-  }
+  ): T =
+    get(feature, key, attributes) as? T ?: throw IllegalArgumentException(
+      "Enum flag $feature must be overridden with override() before use; the default value of the first constant has been DEPRECATED"
+    )
 
   override fun <T> getJson(
     feature: Feature,
@@ -62,31 +65,27 @@ class FakeFeatureFlags @Inject constructor(
     attributes: Attributes
   ): T {
     val jsonFn = get(feature, key, attributes) as? Function0<*> ?: throw IllegalArgumentException(
-        "JSON flag $feature must be overridden with override() before use: ${get(feature, key)}")
+      "JSON flag $feature must be overridden with override() before use: ${get(feature, key)}"
+    )
     // The JSON is lazily provided to handle the case where the override is provided by the
     // FakeFeatureFlagModule and the Moshi instance cannot be accessed inside the module.
     val json = jsonFn.invoke() as? String ?: throw IllegalArgumentException(
-        "JSON function did not provide a string")
+      "JSON function did not provide a string"
+    )
     return moshi.get().adapter(clazz).fromSafeJson(json)
-        ?: throw IllegalArgumentException("null value deserialized from $feature")
+      ?: throw IllegalArgumentException("null value deserialized from $feature")
   }
 
   override fun getBoolean(feature: Feature) = getBoolean(feature, KEY)
   override fun getInt(feature: Feature) = getInt(feature, KEY)
   override fun getString(feature: Feature) = getString(feature, KEY)
-  override fun <T : Enum<T>> getEnum(feature: Feature, clazz: Class<T>): T = getEnum(feature, KEY, clazz)
-  override fun <T> getJson(feature: Feature, clazz: Class<T>): T = getJson(feature, KEY, clazz)
+  override fun <T : Enum<T>> getEnum(feature: Feature, clazz: Class<T>): T = getEnum(
+    feature,
+    KEY,
+    clazz
+  )
 
-  private fun <V> getOrDefault(
-    feature: Feature,
-    key: String,
-    defaultValue: V,
-    attributes: Attributes = defaultAttributes
-  ): V {
-    FeatureFlagValidation.checkValidKey(feature, key)
-    @Suppress("unchecked_cast")
-    return (get(feature, key, attributes) ?: defaultValue) as V
-  }
+  override fun <T> getJson(feature: Feature, clazz: Class<T>): T = getJson(feature, KEY, clazz)
 
   private fun get(
     feature: Feature,
@@ -103,12 +102,14 @@ class FakeFeatureFlags @Inject constructor(
     //       all the attributes of the given attributes.
     //   2.2 If there is no match, return the override value defined at the key level.
     val overrideMapValues = overrides[MapKey(feature, key)]
-        ?: return overrides[MapKey(feature)]?.first()?.value
+      ?: return overrides[MapKey(feature)]?.first()?.value
 
     val overrideMapValuesCopy = PriorityQueue(overrideMapValues)
     var currentMapValue = overrideMapValuesCopy.poll()
-    while(overrideMapValuesCopy.isNotEmpty()) {
-      if (attributes.text.entries.containsAll(currentMapValue.attributes.text.entries)) { break }
+    while (overrideMapValuesCopy.isNotEmpty()) {
+      if (attributes.text.entries.containsAll(currentMapValue.attributes.text.entries)) {
+        break
+      }
       currentMapValue = overrideMapValuesCopy.poll()
     }
     return currentMapValue.value
@@ -148,7 +149,7 @@ class FakeFeatureFlags @Inject constructor(
     overrideKey(feature, KEY, jsonValue, defaultAttributes)
   }
 
-  fun overrideJsonString(feature: Feature, json : String) {
+  fun overrideJsonString(feature: Feature, json: String) {
     overrideKey(feature, KEY, { json }, defaultAttributes)
   }
 
@@ -207,11 +208,14 @@ class FakeFeatureFlags @Inject constructor(
   ) {
     val mapKey = MapKey(feature, key)
     overrides
-        .computeIfAbsent(mapKey) { PriorityQueue() }
-        .add(MapValue(
-            order = overrides[mapKey]!!.size + 1,
-            attributes = attributes,
-            value = value as Any))
+      .computeIfAbsent(mapKey) { PriorityQueue() }
+      .add(
+        MapValue(
+          order = overrides[mapKey]!!.size + 1,
+          attributes = attributes,
+          value = value as Any
+        )
+      )
   }
 
   @JvmOverloads
@@ -238,7 +242,7 @@ class FakeFeatureFlags @Inject constructor(
    * Data class that holds the override value provided for the given [feature, key, attributes].
    */
   private data class MapValue(
-    val order: Int = 1, //Order is used to pick the latest provided map value.
+    val order: Int = 1, // Order is used to pick the latest provided map value.
     val attributes: Attributes = defaultAttributes,
     val value: Any
   ) : Comparable<MapValue> {

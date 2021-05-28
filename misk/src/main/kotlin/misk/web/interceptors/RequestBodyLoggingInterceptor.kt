@@ -4,8 +4,9 @@ import misk.Action
 import misk.ApplicationInterceptor
 import misk.Chain
 import misk.MiskCaller
-import misk.logging.getLogger
 import misk.scope.ActionScoped
+import okhttp3.Headers
+import wisp.logging.getLogger
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlin.reflect.full.findAnnotation
@@ -31,10 +32,10 @@ class RequestBodyLoggingInterceptor @Inject internal constructor(
   ) : ApplicationInterceptor.Factory {
     override fun create(action: Action): ApplicationInterceptor? {
       val logRequestResponse = action.function.findAnnotation<LogRequestResponse>() ?: return null
-      require(0.0 <= logRequestResponse.bodySampling && logRequestResponse.bodySampling <= 1.0) {
+      require(logRequestResponse.bodySampling in 0.0..1.0) {
         "${action.name} @LogRequestResponse bodySampling must be in the range (0.0, 1.0]"
       }
-      require(0.0 <= logRequestResponse.errorBodySampling && logRequestResponse.errorBodySampling <= 1.0) {
+      require(logRequestResponse.errorBodySampling in 0.0..1.0) {
         "${action.name} @LogRequestResponse errorBodySampling must be in the range (0.0, 1.0]"
       }
       if (logRequestResponse.bodySampling == 0.0 && logRequestResponse.errorBodySampling == 0.0) {
@@ -52,11 +53,13 @@ class RequestBodyLoggingInterceptor @Inject internal constructor(
   override fun intercept(chain: Chain): Any {
     val principal = caller.get()?.principal ?: "unknown"
 
-    bodyCapture.set(RequestResponseBody(chain.args, null))
+    val redactedArgs = chain.args.map { if (it is Headers) HeadersCapture(it) else it }
+    bodyCapture.set(RequestResponseBody(redactedArgs, null))
 
     try {
       val result = chain.proceed(chain.args)
-      bodyCapture.set(RequestResponseBody(chain.args, result))
+      // Only log some request headers.
+      bodyCapture.set(RequestResponseBody(redactedArgs, result))
       return result
     } catch (t: Throwable) {
       logger.info { "${action.name} principal=$principal failed" }
@@ -65,14 +68,29 @@ class RequestBodyLoggingInterceptor @Inject internal constructor(
   }
 }
 
+internal data class HeadersCapture(
+  val headers: Map<String, List<String>>
+) {
+  constructor(okHttpHeaders: Headers) : this(
+    okHttpHeaders.toMultimap()
+      .filter { (key, _) ->
+        key.toLowerCase() in listOf(
+          "accept",
+          "accept-encoding",
+          "connection",
+          "content-type",
+          "content-length",
+        )
+      }
+  )
+}
+
 internal class RequestResponseCapture @Inject constructor() {
   companion object {
     private val capture = ThreadLocal<RequestResponseBody>()
   }
 
-  fun get(): RequestResponseBody {
-    return capture.get()
-  }
+  fun get(): RequestResponseBody? = capture.get()
 
   fun set(value: RequestResponseBody) {
     capture.set(value)

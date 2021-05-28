@@ -4,7 +4,6 @@ import com.google.inject.Injector
 import misk.MiskTestingServiceModule
 import misk.ServiceModule
 import misk.concurrent.ExecutorServiceFactory
-import misk.config.Config
 import misk.config.MiskConfig
 import misk.environment.Environment
 import misk.environment.EnvironmentModule
@@ -26,6 +25,7 @@ import org.assertj.core.api.Assertions.assertThat
 import org.hibernate.SessionFactory
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
+import wisp.config.Config
 import java.time.Instant
 import javax.inject.Inject
 import javax.inject.Provider
@@ -35,6 +35,7 @@ import javax.persistence.Entity
 import javax.persistence.GeneratedValue
 import javax.persistence.Table
 import javax.sql.DataSource
+import kotlin.test.assertTrue
 
 @MiskTest(startService = true)
 internal class SchemaValidatorTest {
@@ -55,7 +56,7 @@ internal class SchemaValidatorTest {
       val injectorServiceProvider = getProvider(HibernateInjectorAccess::class.java)
       val entitiesProvider = getProvider(setOfType(HibernateEntity::class).toKey(qualifier))
 
-      val sessionFactoryProvider = getProvider(keyOf<SessionFactory>(qualifier))
+      val sessionFactoryServiceProvider = getProvider(keyOf<SessionFactoryService>(qualifier))
       bind<SessionFactory>()
         .annotatedWith<ValidationDb>()
         .toProvider(keyOf<SessionFactoryService>(qualifier))
@@ -65,8 +66,8 @@ internal class SchemaValidatorTest {
         @Inject lateinit var injector: Injector
         override fun get(): RealTransacter = RealTransacter(
           qualifier = qualifier,
-          sessionFactoryProvider = sessionFactoryProvider,
-          readerSessionFactoryProvider = null,
+          sessionFactoryService = sessionFactoryServiceProvider.get(),
+          readerSessionFactoryService = null,
           config = config.data_source,
           executorServiceFactory = executorServiceFactory,
           hibernateEntities = injector.findBindingsByType(HibernateEntity::class.typeLiteral())
@@ -92,15 +93,17 @@ internal class SchemaValidatorTest {
 
       val dataSourceProvider = getProvider(keyOf<DataSource>(qualifier))
       bind(keyOf<TransacterService>(qualifier)).to(keyOf<SessionFactoryService>(qualifier))
-      bind(keyOf<SessionFactoryService>(qualifier)).toProvider(Provider {
-        SessionFactoryService(
-          qualifier = qualifier,
-          connector = connectorProvider.get(),
-          dataSource = dataSourceProvider,
-          hibernateInjectorAccess = injectorServiceProvider.get(),
-          entityClasses = entitiesProvider.get()
-        )
-      }).asSingleton()
+      bind(keyOf<SessionFactoryService>(qualifier)).toProvider(
+        Provider {
+          SessionFactoryService(
+            qualifier = qualifier,
+            connector = connectorProvider.get(),
+            dataSource = dataSourceProvider,
+            hibernateInjectorAccess = injectorServiceProvider.get(),
+            entityClasses = entitiesProvider.get()
+          )
+        }
+      ).asSingleton()
       install(
         ServiceModule<TransacterService>(qualifier)
           .enhancedBy<SchemaMigratorService>(qualifier)
@@ -134,8 +137,8 @@ internal class SchemaValidatorTest {
   fun findMissingColumnsInHibernate() {
     assertThat(schemaValidationErrorMessage).contains(
       "Hibernate entity \"missing_columns_table\" is missing columns " +
-          "[tbl4_string_column_database] " +
-          "expected in table \"missing_columns_table\""
+        "[tbl4_string_column_database] " +
+        "expected in table \"missing_columns_table\""
     )
   }
 
@@ -143,8 +146,8 @@ internal class SchemaValidatorTest {
   fun findMissingColumnsInDb() {
     assertThat(schemaValidationErrorMessage).contains(
       "Database table \"missing_columns_table\" is missing columns " +
-          "[tbl4_int_column_hibernate, tbl4_string_column_hibernate] " +
-          "found in hibernate \"missing_columns_table\""
+        "[tbl4_int_column_hibernate, tbl4_string_column_hibernate] " +
+        "found in hibernate \"missing_columns_table\""
     )
   }
 
@@ -152,7 +155,8 @@ internal class SchemaValidatorTest {
   fun findNullableColumnsInHibernate() {
     assertThat(schemaValidationErrorMessage).contains(
       "ERROR at schemavalidation.nullable_mismatch_table.tbl5_hibernate_null:\n" +
-          "  Column nullable_mismatch_table.tbl5_hibernate_null is NOT NULL in database but tbl5_hibernate_null is nullable in hibernate"
+        "  Column nullable_mismatch_table.tbl5_hibernate_null is NOT NULL in database " +
+        "but tbl5_hibernate_null is nullable in hibernate"
     )
   }
 
@@ -212,14 +216,23 @@ internal class SchemaValidatorTest {
 
   @Test
   fun catchNotReallyUniqueColumnNames() {
-    assertThat(schemaValidationErrorMessage).contains(
-      "Duplicate identifiers: [[tbl6NotReallyUnique, tbl6_not_really_unique]]"
+    val duplicateIds =
+      schemaValidationErrorMessage.contains(
+        "Duplicate identifiers: [[tbl6NotReallyUnique, tbl6_not_really_unique]]"
+      ) ||
+        schemaValidationErrorMessage.contains(
+          "Duplicate identifiers: [[tbl6_not_really_unique, tbl6NotReallyUnique]]"
+        )
+
+    assertTrue(
+      duplicateIds,
+      "Expected duplicate ids for: [[tbl6_not_really_unique, tbl6NotReallyUnique]]"
     )
 
     assertThat(schemaValidationErrorMessage).contains(
       "Duplicate identifiers: " +
-          "[[tbl6NotReallyUnique, tbl6_not_REALLY_unique], " +
-          "[tbl6NotReallyUnique2, tbl6_not_really_unique2]]"
+        "[[tbl6NotReallyUnique, tbl6_not_REALLY_unique], " +
+        "[tbl6NotReallyUnique2, tbl6_not_really_unique2]]"
     )
   }
 
@@ -231,7 +244,7 @@ internal class SchemaValidatorTest {
 
   @Entity
   @Table(name = "`quoted_basic_table`")
-  class DbBasicTestTable() : DbUnsharded<DbBasicTestTable>, DbTimestampedEntity {
+  class DbBasicTestTable : DbUnsharded<DbBasicTestTable>, DbTimestampedEntity {
 
     @javax.persistence.Id
     @GeneratedValue
@@ -264,7 +277,7 @@ internal class SchemaValidatorTest {
 
   @Entity
   @Table(name = "`hibernate_only_table`")
-  class DbHibernateOnlyTable() : DbUnsharded<DbHibernateOnlyTable> {
+  class DbHibernateOnlyTable : DbUnsharded<DbHibernateOnlyTable> {
     @javax.persistence.Id
     @GeneratedValue
     override lateinit var id: Id<DbHibernateOnlyTable>
@@ -278,7 +291,7 @@ internal class SchemaValidatorTest {
 
   @Entity
   @Table(name = "`missing_columns_table`")
-  class DbMissingColumnsTable() : DbUnsharded<DbMissingColumnsTable> {
+  class DbMissingColumnsTable : DbUnsharded<DbMissingColumnsTable> {
     @javax.persistence.Id
     @GeneratedValue
     override lateinit var id: Id<DbMissingColumnsTable>
@@ -298,7 +311,7 @@ internal class SchemaValidatorTest {
 
   @Entity
   @Table(name = "`nullable_mismatch_table`")
-  class DbNullableMismatchTable() : DbUnsharded<DbNullableMismatchTable> {
+  class DbNullableMismatchTable : DbUnsharded<DbNullableMismatchTable> {
     @javax.persistence.Id
     @GeneratedValue
     override lateinit var id: Id<DbNullableMismatchTable>
@@ -321,7 +334,7 @@ internal class SchemaValidatorTest {
 
   @Entity
   @Table(name = "bad_identifier_table")
-  class DbBadIdentifierTable() : DbUnsharded<DbBadIdentifierTable> {
+  class DbBadIdentifierTable : DbUnsharded<DbBadIdentifierTable> {
     @javax.persistence.Id
     @GeneratedValue
     override lateinit var id: Id<DbBadIdentifierTable>

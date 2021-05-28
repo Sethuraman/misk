@@ -39,9 +39,14 @@ markdown_extensions:
 
 nav:
   - 'Overview': index.md
+  - 'Getting Started': getting-started.md
+  - 'Actions': actions.md
+  - 'Clients': clients.md
   - '0.x API':
       - 'misk': 0.x/misk/index.md
       - 'misk-aws': 0.x/misk-aws/index.md
+      - 'misk-aws-dynamodb': 0.x/misk-aws-dynamodb/index.md
+      - 'misk-aws2-dynamodb': 0.x/misk-aws2-dynamodb/index.md
       - 'misk-crypto': 0.x/misk-crypto/index.md
       - 'misk-eventrouter': 0.x/misk-eventrouter/index.md
       - 'misk-events-core': 0.x/misk-events-core/index.md

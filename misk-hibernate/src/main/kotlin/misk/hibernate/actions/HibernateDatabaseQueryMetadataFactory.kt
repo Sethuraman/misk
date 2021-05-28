@@ -12,8 +12,8 @@ import misk.hibernate.Select
 import misk.hibernate.Session
 import misk.hibernate.actions.HibernateDatabaseQueryDynamicAction.Companion.HIBERNATE_QUERY_DYNAMIC_WEBACTION_PATH
 import misk.hibernate.actions.HibernateDatabaseQueryStaticAction.Companion.HIBERNATE_QUERY_STATIC_WEBACTION_PATH
+import misk.inject.typeLiteral
 import misk.security.authz.AccessAnnotationEntry
-import misk.web.MiskWebFormBuilder
 import misk.web.MiskWebFormBuilder.Companion.createEnumField
 import misk.web.MiskWebFormBuilder.Companion.createSyntheticEnumField
 import misk.web.MiskWebFormBuilder.Companion.maybeCreatePrimitiveField
@@ -28,7 +28,6 @@ import kotlin.reflect.KClass
 import kotlin.reflect.KFunction
 import kotlin.reflect.KType
 import kotlin.reflect.full.allSupertypes
-import kotlin.reflect.full.createType
 import kotlin.reflect.full.declaredMemberFunctions
 import kotlin.reflect.full.findAnnotation
 import kotlin.reflect.full.memberProperties
@@ -45,7 +44,7 @@ internal class HibernateDatabaseQueryMetadataFactory @Inject constructor(
     val table = dbEntityClass.findAnnotation<Table>()!!
 
     val accessAnnotationEntry =
-        accessAnnotationEntries.find { it.annotation == accessAnnotationClass }
+      accessAnnotationEntries.find { it.annotation == accessAnnotationClass }
     val allowedCapabilities = accessAnnotationEntry?.capabilities?.toSet() ?: setOf()
     val allowedServices = accessAnnotationEntry?.services?.toSet() ?: setOf()
 
@@ -61,20 +60,22 @@ internal class HibernateDatabaseQueryMetadataFactory @Inject constructor(
     }
 
     val queryTypes = queryTypesDynamicToInclude +
-        constraintsResult.map { it.second.parametersTypeName to it.first } +
-        ordersResult.map { it.second.parametersTypeName to it.first } +
-        selectsResult.map { it.second.parametersTypeName to it.first }
+      constraintsResult.map { it.second.parametersTypeName to it.first } +
+      ordersResult.map { it.second.parametersTypeName to it.first } +
+      selectsResult.map { it.second.parametersTypeName to it.first }
 
     val isDynamic = queryClass == null &&
-        constraintsResult.isEmpty() &&
-        ordersResult.isEmpty() &&
-        selectsResult.isEmpty()
+      constraintsResult.isEmpty() &&
+      ordersResult.isEmpty() &&
+      selectsResult.isEmpty()
     val queryType = if (isDynamic) {
       makeDynamicQueryTypes(dbEntityClass).toMap()[QUERY_TYPE]!!
     } else {
-      Type(fields = queryTypes.map { (name, _) ->
-        Field(name = name, repeated = false, type = name)
-      })
+      Type(
+        fields = queryTypes.map { (name, _) ->
+          Field(name = name, repeated = false, type = name)
+        }
+      )
     }
 
     val queryWebActionPath = if (isDynamic) {
@@ -83,18 +84,18 @@ internal class HibernateDatabaseQueryMetadataFactory @Inject constructor(
       HIBERNATE_QUERY_STATIC_WEBACTION_PATH
     }
     return DatabaseQueryMetadata(
-        queryWebActionPath = queryWebActionPath,
-        allowedCapabilities = allowedCapabilities,
-        allowedServices = allowedServices,
-        accessAnnotation = accessAnnotationClass,
-        table = table.name,
-        entityClass = dbEntityClass,
-        entitySchema = getDbEntitySchema(dbEntityClass),
-        queryClass = queryClass,
-        constraints = constraintsResult.map { it.second },
-        orders = ordersResult.map { it.second },
-        selects = selectsResult.map { it.second },
-        types = queryTypes.toMap() + mapOf("queryType" to queryType)
+      queryWebActionPath = queryWebActionPath,
+      allowedCapabilities = allowedCapabilities,
+      allowedServices = allowedServices,
+      accessAnnotation = accessAnnotationClass,
+      table = table.name,
+      entityClass = dbEntityClass,
+      entitySchema = getDbEntitySchema(dbEntityClass),
+      queryClass = queryClass,
+      constraints = constraintsResult.map { it.second },
+      orders = ordersResult.map { it.second },
+      selects = selectsResult.map { it.second },
+      types = queryTypes.toMap() + mapOf("queryType" to queryType)
     )
   }
 
@@ -111,11 +112,15 @@ internal class HibernateDatabaseQueryMetadataFactory @Inject constructor(
         val select = function.findAnnotation<Select>()
 
         when {
-          constraint != null -> constraintsResult += constraintMetadata(queryClass, function,
-              constraint)
+          constraint != null -> constraintsResult += constraintMetadata(
+            queryClass, function,
+            constraint
+          )
           order != null -> ordersResult += orderMetadata(queryClass, function, order)
-          select != null -> selectsResult += selectMetadata(queryClass, function, select,
-              function.returnType)
+          select != null -> selectsResult += selectMetadata(
+            queryClass, function, select,
+            function.returnType
+          )
         }
       }
     }
@@ -134,12 +139,12 @@ internal class HibernateDatabaseQueryMetadataFactory @Inject constructor(
       createField(onlyParameter.type, name, onlyParameter.isVararg)
     } ?: Field(name = "Add Constraint", type = Boolean::class.simpleName!!, repeated = false)
     return Type(
-        fields = listOf(field)
+      fields = listOf(field)
     ) to DatabaseQueryMetadata.ConstraintMetadata(
-        name = function.name,
-        parametersTypeName = "Constraint/${queryClass.simpleName}/${function.name}",
-        path = constraint.path,
-        operator = constraint.operator.name
+      name = function.name,
+      parametersTypeName = "Constraint/${queryClass.simpleName}/${function.name}",
+      path = constraint.path,
+      operator = constraint.operator.name
     )
   }
 
@@ -154,15 +159,17 @@ internal class HibernateDatabaseQueryMetadataFactory @Inject constructor(
 
     val field = onlyParameter?.name?.let { name ->
       createField(onlyParameter.type, name, onlyParameter.isVararg)
-    } ?: Field(name = "Add Order (path=${order.path}, asc=${order.asc})",
-        type = Boolean::class.simpleName!!, repeated = false)
+    } ?: Field(
+      name = "Add Order (path=${order.path}, asc=${order.asc})",
+      type = Boolean::class.simpleName!!, repeated = false
+    )
     return Type(
-        fields = listOf(field)
+      fields = listOf(field)
     ) to DatabaseQueryMetadata.OrderMetadata(
-        name = function.name,
-        parametersTypeName = "Order/${queryClass.simpleName}/${function.name}",
-        path = order.path,
-        ascending = order.asc
+      name = function.name,
+      parametersTypeName = "Order/${queryClass.simpleName}/${function.name}",
+      path = order.path,
+      ascending = order.asc
     )
   }
 
@@ -178,8 +185,8 @@ internal class HibernateDatabaseQueryMetadataFactory @Inject constructor(
 
     val paths = if (select.path == "") {
       val maybeProjectionClass =
-          (selectTargetReturnType.arguments.firstOrNull()?.type?.classifier as KClass<*>?)?.supertypes?.filter { it.classifier as KClass<*> == Projection::class }
-              ?.firstOrNull()
+        (selectTargetReturnType.arguments.firstOrNull()?.type?.classifier as KClass<*>?)
+          ?.supertypes?.firstOrNull { it.classifier as KClass<*> == Projection::class }
       if (maybeProjectionClass != null) {
         // TODO (adrw) this projection class path parsing isn't working
         val paths = (maybeProjectionClass.classifier as KClass<*>).members.map { member ->
@@ -201,19 +208,21 @@ internal class HibernateDatabaseQueryMetadataFactory @Inject constructor(
 
     val field = onlyParameter?.name?.let { name ->
       if (onlyParameter.type.classifier as KClass<*> == Session::class) {
-        Field(name = "Add Select (paths=$paths)", type = Boolean::class.simpleName!!,
-            repeated = false)
+        Field(
+          name = "Add Select (paths=$paths)", type = Boolean::class.simpleName!!,
+          repeated = false
+        )
       } else {
         createField(onlyParameter.type, name, onlyParameter.isVararg)
       }
     }
 
     return Type(
-        fields = field?.let { listOf(field) } ?: listOf()
+      fields = field?.let { listOf(field) } ?: listOf()
     ) to DatabaseQueryMetadata.SelectMetadata(
-        name = function.name,
-        parametersTypeName = "Select/${queryClass.simpleName}/${function.name}",
-        paths = paths
+      name = function.name,
+      parametersTypeName = "Select/${queryClass.simpleName}/${function.name}",
+      paths = paths
     )
   }
 
@@ -222,7 +231,7 @@ internal class HibernateDatabaseQueryMetadataFactory @Inject constructor(
     fieldName: String,
     repeated: Boolean
   ): Field? {
-    val fieldClass = fieldType.classifier as KClass<*>
+    val fieldClass = fieldType.typeLiteral().rawType
     val maybeCreatePrimitiveField = maybeCreatePrimitiveField(fieldClass, fieldName, repeated)
     return when {
       maybeCreatePrimitiveField != null -> maybeCreatePrimitiveField
@@ -236,28 +245,30 @@ internal class HibernateDatabaseQueryMetadataFactory @Inject constructor(
         val listType = fieldClassParameters[0].type!!
         createField(listType, fieldName, true)
       }
-      else -> Field(fieldName, fieldClass.qualifiedName!!, repeated)
+      else -> Field(fieldName, fieldClass.canonicalName, repeated)
     }
   }
 
-  private fun <T : DbEntity<T>> KClass<out Query<T>>.criteriaFunctions(): MutableList<KFunction<*>> {
-    val allMethods = mutableListOf<KFunction<*>>()
-    for (function in declaredMemberFunctions) {
-      allMethods += function
-    }
-    for (supertype in allSupertypes) {
-      if (supertype.classifier == Query::class || supertype.classifier == Any::class) continue
-      val classifier = supertype.classifier as? KClass<*> ?: continue
-      for (function in classifier.declaredMemberFunctions) {
+  private fun <T : DbEntity<T>> KClass<out Query<T>>.criteriaFunctions():
+    MutableList<KFunction<*>> {
+      val allMethods = mutableListOf<KFunction<*>>()
+      for (function in declaredMemberFunctions) {
         allMethods += function
       }
+      for (supertype in allSupertypes) {
+        if (supertype.classifier == Query::class || supertype.classifier == Any::class) continue
+        val classifier = supertype.classifier as? KClass<*> ?: continue
+        for (function in classifier.declaredMemberFunctions) {
+          allMethods += function
+        }
+      }
+      return allMethods
     }
-    return allMethods
-  }
 
-  private fun getDbEntitySchema(dbEntityClass: KClass<out DbEntity<*>>): Map<String, KType> = dbEntityClass.memberProperties.map { memberProperty ->
-    memberProperty.name to memberProperty.returnType
-  }.toMap()
+  private fun getDbEntitySchema(dbEntityClass: KClass<out DbEntity<*>>): Map<String, KType> =
+    dbEntityClass.memberProperties.map { memberProperty ->
+      memberProperty.name to memberProperty.returnType
+    }.toMap()
 
   companion object {
     data class DynamicQueryConstraint(
@@ -301,9 +312,8 @@ internal class HibernateDatabaseQueryMetadataFactory @Inject constructor(
         fields = listOf(
           Field(name = "maxRows", repeated = false, type = "Int"),
         )
-      ))
-
-    val DYNAMIC_TYPES = MiskWebFormBuilder().calculateTypes(DynamicQuery::class.createType())
+      )
+    )
 
     fun makeDynamicQueryTypes(dbEntityClass: KClass<out DbEntity<*>>): List<Pair<String, Type>> =
       getQueryConfigType() + listOf(
@@ -315,7 +325,7 @@ internal class HibernateDatabaseQueryMetadataFactory @Inject constructor(
               enumValues = dbEntityClass.memberProperties.map { it.name },
               repeated = false
             ),
-            createEnumField(Operator::class, "operator", false),
+            createEnumField(Operator::class.java, "operator", false),
             Field(name = "value", repeated = false, type = "String"),
           )
         ),

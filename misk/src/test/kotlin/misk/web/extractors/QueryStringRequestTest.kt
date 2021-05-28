@@ -1,5 +1,6 @@
 package misk.web.extractors
 
+import misk.MiskTestingServiceModule
 import misk.inject.KAbstractModule
 import misk.testing.MiskTest
 import misk.testing.MiskTestModule
@@ -7,7 +8,7 @@ import misk.web.Get
 import misk.web.QueryParam
 import misk.web.ResponseContentType
 import misk.web.WebActionModule
-import misk.web.WebTestingModule
+import misk.web.WebServerTestingModule
 import misk.web.actions.WebAction
 import misk.web.jetty.JettyService
 import misk.web.mediatype.MediaTypes
@@ -26,12 +27,12 @@ internal class QueryStringRequestTest {
 
   @Test fun basicParams() {
     assertThat(get("/basic-params", "str=foo&something=stuff&int=12&testEnum=ONE"))
-        .isEqualTo("foo stuff 12 ONE basic-params")
+      .isEqualTo("foo stuff 12 ONE basic-params")
   }
 
   @Test fun optionalParamsPresent() {
     assertThat(get("/optional-params", "str=foo&int=12"))
-        .isEqualTo("foo 12 optional-params")
+      .isEqualTo("foo 12 optional-params")
   }
 
   @Test fun optionalParamsNotPresent() {
@@ -40,7 +41,7 @@ internal class QueryStringRequestTest {
 
   @Test fun defaultParamsPresent() {
     assertThat(get("/default-params", "str=foo&int=12&testEnum=ONE"))
-        .isEqualTo("foo 12 ONE default-params")
+      .isEqualTo("foo 12 ONE default-params")
   }
 
   @Test fun defaultParamsNotPresent() {
@@ -49,7 +50,7 @@ internal class QueryStringRequestTest {
 
   @Test fun listParams() {
     assertThat(get("/list-params", "strs=foo&strs=bar&ints=12&ints=42&strs=baz"))
-        .isEqualTo("foo bar baz 12 42 list-params")
+      .isEqualTo("foo bar baz 12 42 list-params")
   }
 
   enum class TestEnum {
@@ -84,14 +85,18 @@ internal class QueryStringRequestTest {
   class ListParamsAction @Inject constructor() : WebAction {
     @Get("/list-params")
     @ResponseContentType(MediaTypes.APPLICATION_JSON)
-    fun call(@QueryParam strs: List<String>, @QueryParam ints: List<Int>) = "${strs.joinToString(
-        separator = " ")} " +
-        "${ints.joinToString(separator = " ")} list-params"
+    fun call(@QueryParam strs: List<String>, @QueryParam ints: List<Int>) = "${
+    strs.joinToString(
+      separator = " "
+    )
+    } " +
+      "${ints.joinToString(separator = " ")} list-params"
   }
 
   class TestModule : KAbstractModule() {
     override fun configure() {
-      install(WebTestingModule())
+      install(WebServerTestingModule())
+      install(MiskTestingServiceModule())
       install(WebActionModule.create<BasicParamsAction>())
       install(WebActionModule.create<OptionalParamsAction>())
       install(WebActionModule.create<DefaultParamsAction>())
@@ -99,9 +104,11 @@ internal class QueryStringRequestTest {
     }
   }
 
-  private fun get(path: String, query: String): String = call(Request.Builder()
+  private fun get(path: String, query: String): String = call(
+    Request.Builder()
       .url(jettyService.httpServerUrl.newBuilder().encodedPath(path).query(query).build())
-      .get())
+      .get()
+  )
 
   private fun call(request: Request.Builder): String {
     val httpClient = OkHttpClient()

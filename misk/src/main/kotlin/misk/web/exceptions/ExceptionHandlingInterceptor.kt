@@ -5,8 +5,6 @@ import misk.Action
 import misk.exceptions.StatusCode
 import misk.exceptions.UnauthenticatedException
 import misk.exceptions.UnauthorizedException
-import misk.logging.getLogger
-import misk.logging.log
 import misk.web.NetworkChain
 import misk.web.NetworkInterceptor
 import misk.web.Response
@@ -14,6 +12,8 @@ import misk.web.ResponseBody
 import misk.web.mediatype.MediaTypes
 import misk.web.toResponseBody
 import okhttp3.Headers.Companion.toHeaders
+import wisp.logging.getLogger
+import wisp.logging.log
 import java.lang.reflect.InvocationTargetException
 import javax.inject.Inject
 
@@ -69,19 +69,22 @@ class ExceptionHandlingInterceptor(
   private companion object {
     val log = getLogger<ExceptionHandlingInterceptor>()
 
-    val INTERNAL_SERVER_ERROR_RESPONSE = Response("internal server error".toResponseBody(),
-        listOf("Content-Type" to MediaTypes.TEXT_PLAIN_UTF8).toMap().toHeaders(),
-        StatusCode.INTERNAL_SERVER_ERROR.code
+    val INTERNAL_SERVER_ERROR_RESPONSE = Response(
+      "internal server error".toResponseBody(),
+      listOf("Content-Type" to MediaTypes.TEXT_PLAIN_UTF8).toMap().toHeaders(),
+      StatusCode.INTERNAL_SERVER_ERROR.code
     )
 
-    val UNAUTHENTICATED_RESPONSE = Response("unauthenticated".toResponseBody(),
-        listOf("Content-Type" to MediaTypes.TEXT_PLAIN_UTF8).toMap().toHeaders(),
-        StatusCode.UNAUTHENTICATED.code
+    val UNAUTHENTICATED_RESPONSE = Response(
+      "unauthenticated".toResponseBody(),
+      listOf("Content-Type" to MediaTypes.TEXT_PLAIN_UTF8).toMap().toHeaders(),
+      StatusCode.UNAUTHENTICATED.code
     )
 
-    val UNAUTHORIZED_RESPONSE = Response("unauthorized".toResponseBody(),
-        listOf("Content-Type" to MediaTypes.TEXT_PLAIN_UTF8).toMap().toHeaders(),
-        StatusCode.FORBIDDEN.code
+    val UNAUTHORIZED_RESPONSE = Response(
+      "unauthorized".toResponseBody(),
+      listOf("Content-Type" to MediaTypes.TEXT_PLAIN_UTF8).toMap().toHeaders(),
+      StatusCode.FORBIDDEN.code
     )
   }
 }

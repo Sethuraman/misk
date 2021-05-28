@@ -28,9 +28,7 @@ import javax.persistence.GenerationType
 import javax.persistence.Table
 
 class HibernateDatabaseQueryMetadataFactoryTest {
-  private val converter = HibernateDatabaseQueryMetadataFactory(
-    listOf()
-  )
+  private val converter = HibernateDatabaseQueryMetadataFactory(listOf())
 
   @Test
   fun `static happy path`() {
@@ -39,7 +37,9 @@ class HibernateDatabaseQueryMetadataFactoryTest {
     assertThat(metadata.queryWebActionPath).isEqualTo(HIBERNATE_QUERY_STATIC_WEBACTION_PATH)
     assertThat(metadata.allowedCapabilities).isEmpty()
     assertThat(metadata.allowedServices).isEmpty()
-    assertThat(metadata.accessAnnotation).isEqualTo(NoAdminDashboardDatabaseAccess::class.simpleName!!)
+    assertThat(metadata.accessAnnotation).isEqualTo(
+      NoAdminDashboardDatabaseAccess::class.simpleName!!
+    )
     assertThat(metadata.table).isEqualTo("movies")
     assertThat(metadata.entityClass).isEqualTo(DbMovie::class.simpleName)
     assertThat(metadata.queryClass).isEqualTo(MovieQuery::class.simpleName)
@@ -191,11 +191,17 @@ class HibernateDatabaseQueryMetadataFactoryTest {
 
   @Test
   fun `dynamic happy path`() {
-    val metadata = converter.fromQuery(DbMovie::class, null, NoAdminDashboardDatabaseAccess::class)
+    val metadata = converter.fromQuery(
+      DbMovie::class,
+      null,
+      NoAdminDashboardDatabaseAccess::class
+    )
     assertThat(metadata.queryWebActionPath).isEqualTo(HIBERNATE_QUERY_DYNAMIC_WEBACTION_PATH)
     assertThat(metadata.allowedCapabilities).isEmpty()
     assertThat(metadata.allowedServices).isEmpty()
-    assertThat(metadata.accessAnnotation).isEqualTo(NoAdminDashboardDatabaseAccess::class.simpleName!!)
+    assertThat(metadata.accessAnnotation).isEqualTo(
+      NoAdminDashboardDatabaseAccess::class.simpleName!!
+    )
     assertThat(metadata.table).isEqualTo("movies")
     assertThat(metadata.entityClass).isEqualTo(DbMovie::class.simpleName)
     assertThat(metadata.queryClass).isEqualTo("DbMovieDynamicQuery")
@@ -222,7 +228,8 @@ class HibernateDatabaseQueryMetadataFactoryTest {
             ),
             Field(
               name = "operator",
-              type = "Enum<misk.hibernate.Operator,LT,LE,EQ,GE,GT,NE,IN,NOT_IN,IS_NOT_NULL,IS_NULL>",
+              type = "Enum<misk.hibernate.Operator,LT,LE,EQ,EQ_OR_IS_NULL,GE,GT,NE,IN,NOT_IN,IS_NOT_NULL," +
+                "IS_NULL>",
               repeated = false
             ),
             Field(name = "value", type = "String", repeated = false),

@@ -7,6 +7,8 @@ import misk.testing.MiskTest
 import misk.testing.MiskTestModule
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
+import wisp.logging.LogCollector
+import wisp.logging.getLogger
 import javax.inject.Inject
 import kotlin.test.assertFailsWith
 
@@ -14,8 +16,8 @@ import kotlin.test.assertFailsWith
 class LogCollectorTest {
   @MiskTestModule
   val module = Modules.combine(
-      MiskTestingServiceModule(),
-      LogCollectorModule()
+    MiskTestingServiceModule(),
+    LogCollectorModule()
   )
 
   @Inject lateinit var logCollector: LogCollector
@@ -40,7 +42,7 @@ class LogCollectorTest {
     logger.info("this is INFO.")
     logger.warn("this is WARN!")
     assertThat(logCollector.takeMessages(minLevel = Level.INFO))
-        .containsExactly("this is INFO.", "this is WARN!")
+      .containsExactly("this is INFO.", "this is WARN!")
   }
 
   @Test
@@ -51,7 +53,7 @@ class LogCollectorTest {
     testLogger.info("this is from the test logger")
     moduleLogger.info("this is from the module logger")
     assertThat(logCollector.takeMessages(loggerClass = LogCollectorModule::class))
-        .containsExactly("this is from the module logger")
+      .containsExactly("this is from the module logger")
   }
 
   @Test
@@ -61,7 +63,7 @@ class LogCollectorTest {
     logger.info("this matches the pattern")
     logger.info("this does not match the pattern")
     assertThat(logCollector.takeMessages(pattern = Regex("m[a-z]tch[a-z]s")))
-        .containsExactly("this matches the pattern")
+      .containsExactly("this matches the pattern")
   }
 
   @Test

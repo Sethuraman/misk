@@ -1,6 +1,5 @@
 package misk.web.exceptions
 
-import misk.config.Config
 import misk.exceptions.ActionException
 import misk.web.Response
 import misk.web.ResponseBody
@@ -9,6 +8,7 @@ import misk.web.toResponseBody
 import okhttp3.Headers
 import okhttp3.Headers.Companion.toHeaders
 import org.slf4j.event.Level
+import wisp.config.Config
 import javax.inject.Inject
 
 /**
@@ -18,6 +18,7 @@ import javax.inject.Inject
  * are returned with just a status code and minimal messaging, to avoid leaking internal
  * implementation details and possible vulnerabilities
  */
+@Deprecated("Superseded by WebActionExceptionMapper")
 internal class ActionExceptionMapper @Inject internal constructor(
   val config: ActionExceptionLogLevelConfig
 ) : ExceptionMapper<ActionException> {
@@ -35,7 +36,7 @@ internal class ActionExceptionMapper @Inject internal constructor(
 
   private companion object {
     val HEADERS: Headers =
-        listOf("Content-Type" to MediaTypes.TEXT_PLAIN_UTF8).toMap().toHeaders()
+      listOf("Content-Type" to MediaTypes.TEXT_PLAIN_UTF8).toMap().toHeaders()
   }
 }
 

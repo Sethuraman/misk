@@ -4,7 +4,6 @@ import com.google.common.base.Stopwatch
 import com.google.common.util.concurrent.AbstractIdleService
 import misk.jdbc.DataSourceConnector
 import misk.jdbc.DataSourceType
-import misk.logging.getLogger
 import okio.ByteString
 import org.hibernate.SessionFactory
 import org.hibernate.boot.Metadata
@@ -21,6 +20,7 @@ import org.hibernate.mapping.SimpleValue
 import org.hibernate.mapping.Value
 import org.hibernate.service.spi.SessionFactoryServiceRegistry
 import org.hibernate.usertype.UserType
+import wisp.logging.getLogger
 import javax.inject.Provider
 import javax.persistence.Column
 import javax.persistence.Table
@@ -45,6 +45,10 @@ internal class SessionFactoryService(
   private val listenerRegistrations: Set<ListenerRegistration> = setOf()
 ) : AbstractIdleService(), Provider<SessionFactory>, TransacterService {
   private var sessionFactory: SessionFactory? = null
+
+  val threadInTransaction = object : ThreadLocal<Boolean>() {
+    override fun initialValue() = false
+  }
 
   lateinit var hibernateMetadata: Metadata
 
@@ -76,8 +80,8 @@ internal class SessionFactoryService(
       }
     }
     val bootstrapRegistryBuilder = BootstrapServiceRegistryBuilder()
-        .applyIntegrator(integrator)
-        .build()
+      .applyIntegrator(integrator)
+      .build()
 
     val registryBuilder = StandardServiceRegistryBuilder(bootstrapRegistryBuilder)
     registryBuilder.addInitiator(hibernateInjectorAccess)
@@ -98,8 +102,12 @@ internal class SessionFactoryService(
         applySetting(AvailableSettings.CONNECTION_PROVIDER_DISABLES_AUTOCOMMIT, "true")
       }
       if (config.query_timeout != null) {
-        applySetting("javax.persistence.query.timeout", Integer.valueOf(
-            config.query_timeout!!.toMillis().toInt()))
+        applySetting(
+          "javax.persistence.query.timeout",
+          Integer.valueOf(
+            config.query_timeout!!.toMillis().toInt()
+          )
+        )
       }
       if (config.jdbc_statement_batch_size != null) {
         require(config.jdbc_statement_batch_size!! > 0) {
@@ -132,7 +140,7 @@ internal class SessionFactoryService(
       val value: Value? = property.value
       if (value is SimpleValue) {
         val typeName = value.typeName
-            ?: continue // This doesn't have a physical column; it's mapped to another table.
+          ?: continue // This doesn't have a physical column; it's mapped to another table.
         allPropertyTypes += kClassForName(typeName)
       }
     }
@@ -182,16 +190,21 @@ internal class SessionFactoryService(
       value.setTypeParameter("protoColumnField", field)
     } else if (field.isAnnotationPresent(SecretColumn::class.java)) {
       value.typeName = SecretColumnType::class.java.name
-      value.setTypeParameter(SecretColumnType.FIELD_ENCRYPTION_KEY_NAME,
-          field.getAnnotation(SecretColumn::class.java).keyName)
-      value.setTypeParameter(SecretColumnType.FIELD_ENCRYPTION_INDEXABLE,
-          field.getAnnotation(SecretColumn::class.java).indexable.toString())
+      value.setTypeParameter(
+        SecretColumnType.FIELD_ENCRYPTION_KEY_NAME,
+        field.getAnnotation(SecretColumn::class.java).keyName
+      )
+      value.setTypeParameter(
+        SecretColumnType.FIELD_ENCRYPTION_INDEXABLE,
+        field.getAnnotation(SecretColumn::class.java).indexable.toString()
+      )
     } else if (BoxedStringType.isBoxedString(field.type.kotlin)) {
       value.typeName = BoxedStringType::class.java.name
       value.setTypeParameter("boxedStringField", field)
     } else {
-      for (annotation : Annotation in field.annotations) {
-        val transformerAnnotation = annotation.annotationClass.findAnnotation<TransformedType>() ?: continue
+      for (annotation: Annotation in field.annotations) {
+        val transformerAnnotation =
+          annotation.annotationClass.findAnnotation<TransformedType>() ?: continue
         value.typeName = TransformedColumnType::class.java.name
 
         val transformer = transformerAnnotation.transformer
@@ -214,7 +227,6 @@ internal class SessionFactoryService(
         value.setTypeParameter(TransformedColumnType.ARGUMENTS, argMap)
       }
     }
-
   }
 
   /** Returns a custom user type for `propertyType`, or null if the user type should be built-in. */
@@ -252,9 +264,11 @@ internal class SessionFactoryService(
   }
 
   override fun get(): SessionFactory {
-    return sessionFactory ?: throw IllegalStateException("""
+    return sessionFactory ?: throw IllegalStateException(
+      """
       |@${qualifier.simpleName} Hibernate not connected: did you forget to start the service?
       |    If this is a test, then annotate your test class with @MiskTest(startService = true)
-      |""".trimMargin())
+      |""".trimMargin()
+    )
   }
 }

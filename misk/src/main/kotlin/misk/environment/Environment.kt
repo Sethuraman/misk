@@ -1,7 +1,7 @@
 package misk.environment
 
 import com.google.common.base.Preconditions
-import misk.logging.getLogger
+import wisp.logging.getLogger
 
 /** The environment in which the application is running */
 @Deprecated("use Deployment instead")
@@ -48,7 +48,9 @@ enum class Environment {
             rawEnv
           } else {
             // TODO(dhanji): We should remove this default, eventually
-            logger.warn { "No environment variable with key $ENV_ENVIRONMENT found, running in DEVELOPMENT" }
+            logger.warn {
+              "No environment variable with key $ENV_ENVIRONMENT found, running in DEVELOPMENT"
+            }
             DEVELOPMENT.toString()
           }
         }

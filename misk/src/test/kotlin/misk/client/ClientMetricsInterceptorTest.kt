@@ -3,6 +3,10 @@ package misk.client
 import com.google.inject.Provides
 import com.google.inject.name.Named
 import com.google.inject.name.Names
+import java.net.SocketTimeoutException
+import java.time.Duration
+import javax.inject.Inject
+import javax.inject.Singleton
 import misk.MiskTestingServiceModule
 import misk.inject.KAbstractModule
 import misk.metrics.Histogram
@@ -20,11 +24,6 @@ import retrofit2.Call
 import retrofit2.http.Body
 import retrofit2.http.Headers
 import retrofit2.http.POST
-import java.net.SocketTimeoutException
-import java.time.Duration
-import java.util.concurrent.ExecutionException
-import javax.inject.Inject
-import javax.inject.Singleton
 
 @MiskTest
 internal class ClientMetricsInterceptorTest {
@@ -71,9 +70,9 @@ internal class ClientMetricsInterceptorTest {
 
   @Test
   fun timeouts() {
-    assertThatExceptionOfType(ExecutionException::class.java).isThrownBy {
+    assertThatExceptionOfType(SocketTimeoutException::class.java).isThrownBy {
       client.ping(AppRequest(200)).execute().code()
-    }.withCauseInstanceOf(SocketTimeoutException::class.java)
+    }
 
     SoftAssertions.assertSoftly { softly ->
       softly.assertThat(requestDuration.count("pinger.ping", "timeout")).isEqualTo(1)
@@ -84,7 +83,6 @@ internal class ClientMetricsInterceptorTest {
     override fun configure() {
       install(MiskTestingServiceModule())
       install(TypedHttpClientModule.create<Pinger>("pinger", Names.named("pinger")))
-      multibind<ClientNetworkInterceptor.Factory>().to<ClientMetricsInterceptor.Factory>()
       bind<MockWebServer>().toInstance(MockWebServer())
     }
 
@@ -93,20 +91,24 @@ internal class ClientMetricsInterceptorTest {
     fun provideHttpClientConfig(server: MockWebServer): HttpClientsConfig {
       val url = server.url("/")
       return HttpClientsConfig(
-          endpoints = mapOf("pinger" to HttpClientEndpointConfig(
-              url = url.toString(),
-              clientConfig = HttpClientConfig(
-                  readTimeout = Duration.ofMillis(100)
-              )
-          )))
+        endpoints = mapOf(
+          "pinger" to HttpClientEndpointConfig(
+            url = url.toString(),
+            clientConfig = HttpClientConfig(
+              readTimeout = Duration.ofMillis(100)
+            )
+          )
+        )
+      )
     }
   }
 
   interface Pinger {
     @POST("/ping")
     @Headers(
-        "Accept: " + MediaTypes.APPLICATION_JSON,
-        "Content-type: " + MediaTypes.APPLICATION_JSON)
+      "Accept: " + MediaTypes.APPLICATION_JSON,
+      "Content-type: " + MediaTypes.APPLICATION_JSON
+    )
     fun ping(@Body request: AppRequest): Call<AppResponse>
   }
 }

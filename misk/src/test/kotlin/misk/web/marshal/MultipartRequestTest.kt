@@ -1,5 +1,6 @@
 package misk.web.marshal
 
+import misk.MiskTestingServiceModule
 import misk.inject.KAbstractModule
 import misk.testing.MiskTest
 import misk.testing.MiskTestModule
@@ -8,6 +9,7 @@ import misk.web.RequestBody
 import misk.web.RequestContentType
 import misk.web.ResponseContentType
 import misk.web.WebActionModule
+import misk.web.WebServerTestingModule
 import misk.web.WebTestingModule
 import misk.web.actions.WebAction
 import misk.web.jetty.JettyService
@@ -34,23 +36,24 @@ internal class MultipartRequestTest {
   @Test
   fun `happy path`() {
     val multipartBody = MultipartBody.Builder()
-        .addPart(
-            headersOf("a", "apple", "b", "banana"),
-            "fruit salad!\n".toRequestBody("text/plain".toMediaType())
-        )
-        .addFormDataPart("d", "good doggo")
-        .build()
+      .addPart(
+        headersOf("a", "apple", "b", "banana"),
+        "fruit salad!\n".toRequestBody("text/plain".toMediaType())
+      )
+      .addFormDataPart("d", "good doggo")
+      .build()
 
     val request = Builder()
-        .url(jettyService.httpServerUrl.resolve("/echo-multipart")!!)
-        .post(multipartBody)
+      .url(jettyService.httpServerUrl.resolve("/echo-multipart")!!)
+      .post(multipartBody)
     val httpClient = OkHttpClient()
     val response = httpClient.newCall(request.build()).execute()
 
     assertThat(response.code).isEqualTo(200)
     assertThat(response.header("Content-Type")).isEqualTo(MediaTypes.TEXT_PLAIN_UTF8)
     val body = response.body?.string()!!
-    assertThat(body).isEqualTo("""
+    assertThat(body).isEqualTo(
+      """
         |part 0:
         |  a: apple
         |  b: banana
@@ -62,14 +65,15 @@ internal class MultipartRequestTest {
         |  Content-Disposition: form-data; name="d"
         |  Content-Length: 10
         |good doggo
-        |""".trimMargin())
+        |""".trimMargin()
+    )
   }
 
   @Test
   fun `missing boundary parameter`() {
     val request = Builder()
-        .url(jettyService.httpServerUrl.resolve("/echo-multipart")!!)
-        .post("not actually multipart!".toRequestBody("multipart/mixed".toMediaType()))
+      .url(jettyService.httpServerUrl.resolve("/echo-multipart")!!)
+      .post("not actually multipart!".toRequestBody("multipart/mixed".toMediaType()))
     val httpClient = OkHttpClient()
     val response = httpClient.newCall(request.build()).execute()
 
@@ -101,7 +105,8 @@ internal class MultipartRequestTest {
 
   class TestModule : KAbstractModule() {
     override fun configure() {
-      install(WebTestingModule())
+      install(WebServerTestingModule())
+      install(MiskTestingServiceModule())
       install(WebActionModule.create<EchoMultipart>())
     }
   }

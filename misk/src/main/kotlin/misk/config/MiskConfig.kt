@@ -16,17 +16,17 @@ import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule
 import com.fasterxml.jackson.module.kotlin.KotlinModule
 import com.fasterxml.jackson.module.kotlin.MissingKotlinParameterException
 import com.google.common.base.Joiner
-import java.io.File
-import java.io.FilenameFilter
-import java.util.Locale
 import misk.environment.Env
 import misk.environment.Environment
 import misk.resources.ResourceLoader
 import org.apache.commons.lang3.StringUtils
+import java.io.File
+import java.io.FilenameFilter
+import java.util.Locale
 
 object MiskConfig {
   @JvmStatic
-  inline fun <reified T : Config> load(
+  inline fun <reified T : wisp.config.Config> load(
     appName: String,
     environment: Env,
     overrideFiles: List<File> = listOf(),
@@ -37,7 +37,7 @@ object MiskConfig {
 
   @JvmStatic
   @Deprecated("Use load function that takes Env")
-  inline fun <reified T : Config> load(
+  inline fun <reified T : wisp.config.Config> load(
     appName: String,
     environment: String,
     overrideFiles: List<File> = listOf(),
@@ -48,7 +48,7 @@ object MiskConfig {
 
   @JvmStatic
   @Deprecated("the Environment enum is deprecated")
-  inline fun <reified T : Config> load(
+  inline fun <reified T : wisp.config.Config> load(
     appName: String,
     environment: Environment,
     overrideFiles: List<File> = listOf(),
@@ -58,8 +58,8 @@ object MiskConfig {
   }
 
   @JvmStatic
-  fun <T : Config> load(
-    configClass: Class<out Config>,
+  fun <T : wisp.config.Config> load(
+    configClass: Class<out wisp.config.Config>,
     appName: String,
     environment: Env,
     overrideFiles: List<File> = listOf(),
@@ -84,23 +84,31 @@ object MiskConfig {
       return mapper.readValue(jsonNode.toString(), configClass) as T
     } catch (e: MissingKotlinParameterException) {
       throw IllegalStateException(
-          "could not find '${e.parameter.name}' of '${configClass.simpleName}'" +
-              " in $configFile or in any of the combined logical config", e)
+        "could not find '${e.parameter.name}' of '${configClass.simpleName}'" +
+          " in $configFile or in any of the combined logical config",
+        e
+      )
     } catch (e: UnrecognizedPropertyException) {
       val path = Joiner.on('.').join(e.path.map { it.fieldName })
       throw IllegalStateException(
-          "error in $configFile: '$path' not found in '${configClass.simpleName}' ${suggestSpelling(
-              e)}", e)
+        "error in $configFile: '$path' not found in '${configClass.simpleName}' ${
+        suggestSpelling(
+          e
+        )
+        }",
+        e
+      )
     } catch (e: Exception) {
       throw IllegalStateException(
-          "failed to load configuration for $appName $environment: ${e.message}", e)
+        "failed to load configuration for $appName $environment: ${e.message}", e
+      )
     }
   }
 
   @JvmStatic
   @Deprecated("Use load function that takes Env")
-  fun <T : Config> load(
-    configClass: Class<out Config>,
+  fun <T : wisp.config.Config> load(
+    configClass: Class<out wisp.config.Config>,
     appName: String,
     environment: String,
     overrideFiles: List<File> = listOf(),
@@ -117,14 +125,15 @@ object MiskConfig {
     return if (suggestions.isNotEmpty()) "(Did you mean one of $suggestions?)" else ""
   }
 
-  fun <T : Config> toYaml(config: T, resourceLoader: ResourceLoader): String {
+  fun <T : wisp.config.Config> toYaml(config: T, resourceLoader: ResourceLoader): String {
     return newObjectMapper(resourceLoader).writeValueAsString(config)
   }
 
   private fun newObjectMapper(resourceLoader: ResourceLoader): ObjectMapper {
     val mapper = ObjectMapper(YAMLFactory()).registerModules(
-        KotlinModule(),
-        JavaTimeModule())
+      KotlinModule(),
+      JavaTimeModule()
+    )
 
     // The SecretDeserializer supports deserializing json, so bind last so it can use previous
     // mappings.
@@ -176,24 +185,24 @@ object MiskConfig {
 
     // Load from jar files first, starting with the common config and then env specific config
     val embeddedConfigUrls = embeddedConfigFileNames(appName, environment)
-        .map { "classpath:/$it" }
+      .map { "classpath:/$it" }
 
     // Load from override files second, in the order specified, only if they exist
     val overrideFileUrls = overrideFiles.map { "filesystem:${it.absoluteFile}" }
-        .filter { resourceLoader.exists(it) }
+      .filter { resourceLoader.exists(it) }
 
     // Produce a combined map of all of the results
     return (embeddedConfigUrls + overrideFileUrls)
-        .map { it to resourceLoader.utf8(it) }
-        .toMap()
+      .map { it to resourceLoader.utf8(it) }
+      .toMap()
   }
 
   /** @return the list of config file names in the order they should be read */
   private fun embeddedConfigFileNames(appName: String, environment: Env) =
-      listOf("common", environment.name.toLowerCase(Locale.US)).map { "$appName-$it.yaml" }
+    listOf("common", environment.name.toLowerCase(Locale.US)).map { "$appName-$it.yaml" }
 
   class SecretJacksonModule(val resourceLoader: ResourceLoader, val mapper: ObjectMapper) :
-      SimpleModule() {
+    SimpleModule() {
     override fun setupModule(context: SetupContext?) {
       addDeserializer(Secret::class.java, SecretDeserializer(resourceLoader, mapper))
       super.setupModule(context)
@@ -205,7 +214,7 @@ object MiskConfig {
     val mapper: ObjectMapper,
     val type: JavaType? = null
   ) : JsonDeserializer<Secret<*>>(),
-      ContextualDeserializer {
+    ContextualDeserializer {
 
     override fun createContextual(
       deserializationContext: DeserializationContext?,
@@ -220,8 +229,10 @@ object MiskConfig {
     ): Secret<*>? {
       if (type == null) {
         // This only happens if ObjectMapper does not call createContextual fo this property.
-        throw JsonMappingException.from(jsonParser,
-            "Attempting to deserialize an object with no type")
+        throw JsonMappingException.from(
+          jsonParser,
+          "Attempting to deserialize an object with no type"
+        )
       }
       val reference = deserializationContext.readValue(jsonParser, String::class.java) as String
       return RealSecret(loadSecret(reference, type))
@@ -254,7 +265,8 @@ object MiskConfig {
             "Secret [$reference] needs a file extension for parsing."
           }
           throw IllegalStateException(
-              "Unknown file extension \"$referenceFileExtension\" for secret [$reference].")
+            "Unknown file extension \"$referenceFileExtension\" for secret [$reference]."
+          )
         }
       }
     }

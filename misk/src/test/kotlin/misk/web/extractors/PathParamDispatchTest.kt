@@ -1,5 +1,6 @@
 package misk.web.extractors
 
+import misk.MiskTestingServiceModule
 import misk.inject.KAbstractModule
 import misk.testing.MiskTest
 import misk.testing.MiskTestModule
@@ -7,6 +8,7 @@ import misk.web.Get
 import misk.web.PathParam
 import misk.web.ResponseContentType
 import misk.web.WebActionModule
+import misk.web.WebServerTestingModule
 import misk.web.WebTestingModule
 import misk.web.actions.WebAction
 import misk.web.jetty.JettyService
@@ -47,7 +49,8 @@ internal class PathParamDispatchTest {
 
   class TestModule : KAbstractModule() {
     override fun configure() {
-      install(WebTestingModule())
+      install(WebServerTestingModule())
+      install(MiskTestingServiceModule())
       install(WebActionModule.create<GetObjectDetails>())
       install(WebActionModule.create<CustomPathParamName>())
     }
@@ -72,9 +75,9 @@ internal class PathParamDispatchTest {
   fun get(path: String): okhttp3.Response {
     val httpClient = OkHttpClient()
     val request = Request.Builder()
-        .get()
-        .url(serverUrlBuilder().encodedPath(path).build())
-        .build()
+      .get()
+      .url(serverUrlBuilder().encodedPath(path).build())
+      .build()
     return httpClient.newCall(request).execute()
   }
 

@@ -8,10 +8,10 @@ import misk.environment.Environment
 import misk.inject.KAbstractModule
 import misk.inject.getInstance
 import misk.inject.uninject
-import misk.logging.getLogger
 import org.junit.jupiter.api.extension.AfterEachCallback
 import org.junit.jupiter.api.extension.BeforeEachCallback
 import org.junit.jupiter.api.extension.ExtensionContext
+import wisp.logging.getLogger
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.TimeUnit
 import javax.inject.Inject
@@ -136,10 +136,12 @@ internal class MiskTestExtension : BeforeEachCallback, AfterEachCallback {
     if (!runningDependencies.contains(id)) {
       log.info { "starting $id" }
       startup()
-      Runtime.getRuntime().addShutdownHook(Thread {
-        log.info { "stopping $id" }
-        shutdown()
-      })
+      Runtime.getRuntime().addShutdownHook(
+        Thread {
+          log.info { "stopping $id" }
+          shutdown()
+        }
+      )
       runningDependencies.add(id)
     } else {
       log.info { "$id already running, not starting anything" }

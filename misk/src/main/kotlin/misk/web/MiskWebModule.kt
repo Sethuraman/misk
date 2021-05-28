@@ -3,11 +3,23 @@ package misk.web
 import com.google.inject.Provider
 import com.google.inject.Provides
 import com.google.inject.TypeLiteral
+import com.google.inject.multibindings.MapBinder
+import java.io.IOException
+import java.util.concurrent.ArrayBlockingQueue
+import java.util.concurrent.BlockingQueue
+import java.util.concurrent.SynchronousQueue
+import java.util.concurrent.ThreadPoolExecutor
+import java.util.concurrent.TimeUnit
+import javax.inject.Inject
+import javax.inject.Singleton
+import javax.servlet.http.HttpServletRequest
 import misk.ApplicationInterceptor
 import misk.MiskCaller
 import misk.MiskDefault
 import misk.ServiceModule
+import misk.concurrent.NetflixMetricsAdapter
 import misk.exceptions.ActionException
+import misk.exceptions.WebActionException
 import misk.grpc.GrpcFeatureBinding
 import misk.inject.KAbstractModule
 import misk.queuing.TimedBlockingQueue
@@ -26,6 +38,7 @@ import misk.web.exceptions.EofExceptionMapper
 import misk.web.exceptions.ExceptionHandlingInterceptor
 import misk.web.exceptions.ExceptionMapperModule
 import misk.web.exceptions.IOExceptionMapper
+import misk.web.exceptions.WebActionExceptionMapper
 import misk.web.extractors.FormValueFeatureBinding
 import misk.web.extractors.PathParamFeatureBinding
 import misk.web.extractors.QueryParamFeatureBinding
@@ -58,6 +71,11 @@ import misk.web.marshal.PlainTextMarshaller
 import misk.web.marshal.ProtobufMarshaller
 import misk.web.marshal.ProtobufUnmarshaller
 import misk.web.marshal.Unmarshaller
+import misk.web.mdc.LogContextProvider
+import misk.web.mdc.RequestHttpMethodLogContextProvider
+import misk.web.mdc.RequestProtocolLogContextProvider
+import misk.web.mdc.RequestRemoteAddressLogContextProvider
+import misk.web.mdc.RequestURILogContextProvider
 import misk.web.proxy.WebProxyEntry
 import misk.web.resources.StaticResourceEntry
 import org.eclipse.jetty.io.EofException
@@ -66,15 +84,6 @@ import org.eclipse.jetty.server.handler.gzip.GzipHandler
 import org.eclipse.jetty.util.thread.ExecutorThreadPool
 import org.eclipse.jetty.util.thread.QueuedThreadPool
 import org.eclipse.jetty.util.thread.ThreadPool
-import java.io.IOException
-import java.util.concurrent.ArrayBlockingQueue
-import java.util.concurrent.BlockingQueue
-import java.util.concurrent.SynchronousQueue
-import java.util.concurrent.ThreadPoolExecutor
-import java.util.concurrent.TimeUnit
-import javax.inject.Inject
-import javax.inject.Singleton
-import javax.servlet.http.HttpServletRequest
 
 class MiskWebModule(private val config: WebConfig) : KAbstractModule() {
   override fun configure() {
@@ -108,49 +117,63 @@ class MiskWebModule(private val config: WebConfig) : KAbstractModule() {
     newMultibinder<ApplicationInterceptor.Factory>()
     newMultibinder<StaticResourceEntry>()
     newMultibinder<WebProxyEntry>()
+    val logContextProviderBinder = MapBinder.newMapBinder(
+      binder(),
+      String::class.java, LogContextProvider::class.java
+    )
+    logContextProviderBinder.addBinding(RequestLogContextInterceptor.MDC_HTTP_METHOD)
+      .to<RequestHttpMethodLogContextProvider>()
+    logContextProviderBinder.addBinding(RequestLogContextInterceptor.MDC_PROTOCOL)
+      .to<RequestProtocolLogContextProvider>()
+    logContextProviderBinder.addBinding(RequestLogContextInterceptor.MDC_REMOTE_ADDR)
+      .to<RequestRemoteAddressLogContextProvider>()
+    logContextProviderBinder.addBinding(RequestLogContextInterceptor.MDC_REQUEST_URI)
+      .to<RequestURILogContextProvider>()
 
     // Register built-in interceptors. Interceptors run in the order in which they are
     // installed, and the order of these interceptors is critical.
 
     multibind<NetworkInterceptor.Factory>(MiskDefault::class)
-        .to<RebalancingInterceptor.Factory>()
+      .to<RebalancingInterceptor.Factory>()
 
     // Handle all unexpected errors that occur during dispatch
     multibind<NetworkInterceptor.Factory>(MiskDefault::class)
-        .to<InternalErrorInterceptorFactory>()
+      .to<InternalErrorInterceptorFactory>()
 
     // Add request related fields to MDC for logging
     multibind<NetworkInterceptor.Factory>(MiskDefault::class)
-        .to<RequestLogContextInterceptor.Factory>()
+      .to<RequestLogContextInterceptor.Factory>()
 
     // Collect metrics on the status of results and response times of requests
     multibind<NetworkInterceptor.Factory>(MiskDefault::class)
-        .to<MetricsInterceptor.Factory>()
+      .to<MetricsInterceptor.Factory>()
 
     newMultibinder<ConcurrencyLimiterFactory>()
     if (!config.concurrency_limiter_disabled) {
       // Shed calls when we're degraded.
       multibind<NetworkInterceptor.Factory>(MiskDefault::class)
-          .to<ConcurrencyLimitsInterceptor.Factory>()
+        .to<ConcurrencyLimitsInterceptor.Factory>()
     }
+    install(NetflixMetricsAdapter.MODULE)
 
     // Traces requests as they work their way through the system.
     multibind<NetworkInterceptor.Factory>(MiskDefault::class)
-        .to<TracingInterceptor.Factory>()
+      .to<TracingInterceptor.Factory>()
 
     // Convert and log application level exceptions into their appropriate response format
     multibind<NetworkInterceptor.Factory>(MiskDefault::class)
-        .to<ExceptionHandlingInterceptor.Factory>()
+      .to<ExceptionHandlingInterceptor.Factory>()
 
     // Optionally log request and response details
     multibind<NetworkInterceptor.Factory>(MiskDefault::class)
-        .to<RequestLoggingInterceptor.Factory>()
+      .to<RequestLoggingInterceptor.Factory>()
 
     // Optionally log request and response body
     multibind<ApplicationInterceptor.Factory>(MiskDefault::class)
-        .to<RequestBodyLoggingInterceptor.Factory>()
+      .to<RequestBodyLoggingInterceptor.Factory>()
 
     install(ExceptionMapperModule.create<ActionException, ActionExceptionMapper>())
+    install(ExceptionMapperModule.create<WebActionException, WebActionExceptionMapper>())
     install(ExceptionMapperModule.create<IOException, IOExceptionMapper>())
     install(ExceptionMapperModule.create<EofException, EofExceptionMapper>())
 
@@ -180,20 +203,22 @@ class MiskWebModule(private val config: WebConfig) : KAbstractModule() {
     val idleTimeout = 60_000
     if (config.jetty_max_thread_pool_queue_size > 0) {
       val threadPool = QueuedThreadPool(
-          maxThreads,
-          minThreads,
-          idleTimeout,
-          provideThreadPoolQueue(getProvider(ThreadPoolQueueMetrics::class.java)))
+        maxThreads,
+        minThreads,
+        idleTimeout,
+        provideThreadPoolQueue(getProvider(ThreadPoolQueueMetrics::class.java))
+      )
       threadPool.name = "jetty-thread"
       bind<ThreadPool>().toInstance(threadPool)
       bind<MeasuredThreadPool>().toInstance(MeasuredQueuedThreadPool(threadPool))
     } else {
       val executor = ThreadPoolExecutor(
-          minThreads,
-          maxThreads,
-          idleTimeout.toLong(),
-          TimeUnit.MILLISECONDS,
-          SynchronousQueue())
+        minThreads,
+        maxThreads,
+        idleTimeout.toLong(),
+        TimeUnit.MILLISECONDS,
+        SynchronousQueue()
+      )
       val threadPool = ExecutorThreadPool(executor)
       threadPool.name = "jetty-thread"
       bind<ThreadPool>().toInstance(threadPool)
@@ -211,15 +236,16 @@ class MiskWebModule(private val config: WebConfig) : KAbstractModule() {
     return GzipHandler()
   }
 
-  private fun provideThreadPoolQueue(metrics: Provider<ThreadPoolQueueMetrics>): BlockingQueue<Runnable> {
-    return if (config.enable_thread_pool_queue_metrics) {
-      TimedBlockingQueue(
+  private fun provideThreadPoolQueue(metrics: Provider<ThreadPoolQueueMetrics>):
+    BlockingQueue<Runnable> {
+      return if (config.enable_thread_pool_queue_metrics) {
+        TimedBlockingQueue(
           config.jetty_max_thread_pool_queue_size
-      ) { d -> metrics.get().recordQueueLatency(d) }
-    } else {
-      ArrayBlockingQueue<Runnable>(config.jetty_max_thread_pool_queue_size)
+        ) { d -> metrics.get().recordQueueLatency(d) }
+      } else {
+        ArrayBlockingQueue<Runnable>(config.jetty_max_thread_pool_queue_size)
+      }
     }
-  }
 
   class MiskCallerProvider @Inject constructor(
     private val authenticators: List<MiskCallerAuthenticator>

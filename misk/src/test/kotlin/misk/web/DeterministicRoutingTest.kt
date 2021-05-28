@@ -1,5 +1,6 @@
 package misk.web
 
+import misk.MiskTestingServiceModule
 import misk.inject.KAbstractModule
 import misk.testing.MiskTest
 import misk.testing.MiskTestModule
@@ -61,13 +62,14 @@ internal class DeterministicRoutingTest {
 
   class TestModule : KAbstractModule() {
     override fun configure() {
-      install(WebTestingModule())
+      install(WebServerTestingModule())
+      install(MiskTestingServiceModule())
       val webActions = mutableListOf(
-          WholePathAction::class,
-          RemainderPathAction::class,
-          SectionAction::class,
-          SubsectionAction::class,
-          SpecificPathAction::class
+        WholePathAction::class,
+        RemainderPathAction::class,
+        SectionAction::class,
+        SubsectionAction::class,
+        SpecificPathAction::class
       )
       shuffle(webActions)
       for (webAction in webActions) {
@@ -76,9 +78,11 @@ internal class DeterministicRoutingTest {
     }
   }
 
-  private fun get(path: String): String = call(Request.Builder()
+  private fun get(path: String): String = call(
+    Request.Builder()
       .url(jettyService.httpServerUrl.newBuilder().encodedPath(path).build())
-      .get())
+      .get()
+  )
 
   private fun call(request: Request.Builder): String {
     val httpClient = OkHttpClient()

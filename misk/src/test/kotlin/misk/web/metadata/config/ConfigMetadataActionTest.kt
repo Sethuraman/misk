@@ -1,6 +1,5 @@
 package misk.web.metadata.config
 
-import misk.config.Config
 import misk.environment.Environment
 import misk.testing.MiskTest
 import misk.testing.MiskTestModule
@@ -8,6 +7,7 @@ import misk.web.metadata.MetadataTestingModule
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
+import wisp.config.Config
 
 @MiskTest(startService = true)
 class ConfigMetadataActionTest {
@@ -24,9 +24,10 @@ class ConfigMetadataActionTest {
 
   @BeforeEach fun beforeEach() {
     configMetadataAction = ConfigMetadataAction(
-        "admin_dashboard_app",
-        Environment.TESTING,
-        testConfig)
+      "admin_dashboard_app",
+      Environment.TESTING,
+      testConfig
+    )
   }
 
   @Test fun passesAlongEffectiveConfig() {

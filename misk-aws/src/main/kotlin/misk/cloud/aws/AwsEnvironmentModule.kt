@@ -4,16 +4,17 @@ import com.google.inject.Provides
 import misk.environment.EnvVarLoader
 import misk.environment.ForEnvVars
 import misk.inject.KAbstractModule
+import wisp.aws.environment.AwsEnvironment
 
 /** [AwsEnvironmentModule] pulls region and account information from installed env vars */
 class AwsEnvironmentModule : KAbstractModule() {
 
   @Provides fun awsRegion(envVarLoader: EnvVarLoader): AwsRegion {
-    return AwsRegion(envVarLoader.getEnvVar("REGION"))
+    return AwsEnvironment.awsRegion(envVarLoader).toMiskAwsRegion()
   }
 
   @Provides fun awsAccountId(envVarLoader: EnvVarLoader): AwsAccountId {
-    return AwsAccountId(envVarLoader.getEnvVar("ACCOUNT_ID"))
+    return AwsEnvironment.awsAccountId(envVarLoader).toMiskAwsAccountId()
   }
 }
 
@@ -23,8 +24,8 @@ class AwsEnvironmentModule : KAbstractModule() {
 class FakeAwsEnvironmentModule : KAbstractModule() {
   override fun configure() {
     newMapBinder<String, String>(ForEnvVars::class)
-        .addBinding("REGION").toInstance("us-east-1")
+      .addBinding("REGION").toInstance("us-east-1")
     newMapBinder<String, String>(ForEnvVars::class)
-        .addBinding("ACCOUNT_ID").toInstance("8675309")
+      .addBinding("ACCOUNT_ID").toInstance("8675309")
   }
 }

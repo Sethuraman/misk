@@ -3,6 +3,7 @@ package misk.web.interceptors
 import misk.Action
 import misk.ApplicationInterceptor
 import misk.Chain
+import misk.MiskTestingServiceModule
 import misk.inject.KAbstractModule
 import misk.testing.MiskTest
 import misk.testing.MiskTestModule
@@ -13,6 +14,7 @@ import misk.web.PathParam
 import misk.web.Response
 import misk.web.ResponseContentType
 import misk.web.WebActionModule
+import misk.web.WebServerTestingModule
 import misk.web.WebTestingModule
 import misk.web.actions.WebAction
 import misk.web.jetty.JettyService
@@ -112,10 +114,12 @@ class UserInterceptorTest {
 
   internal data class TestActionResponse(val text: String)
 
-  private fun get(path: String, mode: String = "normal"): okhttp3.Response = call(Request.Builder()
+  private fun get(path: String, mode: String = "normal"): okhttp3.Response = call(
+    Request.Builder()
       .addHeader("mode", mode)
       .url(jettyService.httpServerUrl.newBuilder().encodedPath(path).build())
-      .get())
+      .get()
+  )
 
   private fun call(request: Request.Builder): okhttp3.Response {
     val httpClient = OkHttpClient()
@@ -125,7 +129,8 @@ class UserInterceptorTest {
 
   class TestModule : KAbstractModule() {
     override fun configure() {
-      install(WebTestingModule())
+      install(WebServerTestingModule())
+      install(MiskTestingServiceModule())
       multibind<NetworkInterceptor.Factory>().toInstance(UserCreatedNetworkInterceptor.Factory())
       multibind<ApplicationInterceptor.Factory>().toInstance(UserCreatedInterceptor.Factory())
 
@@ -135,7 +140,7 @@ class UserInterceptorTest {
 
   companion object {
     internal val TEXT_HEADERS: Headers = Headers.Builder()
-        .set("Content-Type", MediaTypes.TEXT_PLAIN_UTF8)
-        .build()
+      .set("Content-Type", MediaTypes.TEXT_PLAIN_UTF8)
+      .build()
   }
 }

@@ -11,6 +11,11 @@ import misk.testing.MiskTestModule
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.containsExactly
 import org.junit.jupiter.api.Test
+import wisp.logging.LogCollector
+import wisp.logging.error
+import wisp.logging.getLogger
+import wisp.logging.info
+import wisp.logging.warn
 import javax.inject.Inject
 
 @MiskTest(startService = true)
@@ -64,7 +69,11 @@ class SampledLoggerTest {
 
     // Sampled logger is rate-limited
     sampledLogger.info("user-id" to "blerb1") { "sampled test 1" }
-    sampledLogger.error(NullPointerException("failed!"),"user-id" to "blerb2", "context-id" to "111111") { "sampled test 2" }
+    sampledLogger.error(
+      NullPointerException("failed!"),
+      "user-id" to "blerb2",
+      "context-id" to "111111"
+    ) { "sampled test 2" }
     sampledLogger.warn("user-id" to "blerb3") { "sampled test 3" }
 
     val sampledEvents = logCollector.takeEvents(LoggingTest::class)
